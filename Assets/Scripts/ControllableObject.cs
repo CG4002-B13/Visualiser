@@ -19,7 +19,7 @@ public class ControllableObject : MonoBehaviour
 
     private bool _isMovingUp = false;
     private bool _isMovingDown = false;
-    private bool _isRotaryMode = false; // Always starts in Axial mode
+    private bool _isRotaryMode = false;
     private bool _isSelected = false;
 
     private Material originalMaterial;
@@ -57,9 +57,18 @@ public class ControllableObject : MonoBehaviour
     public void Select()
     {
         _isSelected = true;
+        _isRotaryMode = false; // Always reset to Axial mode when selected
 
-        // IMPORTANT: Reset to Axial mode when selected
-        _isRotaryMode = false;
+        // Make NON-KINEMATIC when selected (allows manual movement)
+        if (_rigidbody != null)
+        {
+            _rigidbody.isKinematic = false;
+            _rigidbody.constraints = RigidbodyConstraints.FreezeRotation; // Freeze rotation for Axial mode
+
+            // Reset any residual velocity
+            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.angularVelocity = Vector3.zero;
+        }
 
         // Visual feedback
         if (objectRenderer != null && highlightMaterial != null)
@@ -67,9 +76,7 @@ public class ControllableObject : MonoBehaviour
             objectRenderer.material = highlightMaterial;
         }
 
-        // Sync the toggle button with this object's mode
         SyncModeButton();
-
         Debug.Log($"{gameObject.name} selected - Mode: Axial");
     }
 
@@ -77,11 +84,23 @@ public class ControllableObject : MonoBehaviour
     {
         _isSelected = false;
 
+        // Make KINEMATIC when deselected (prevents all physics interactions)
+        if (_rigidbody != null)
+        {
+            _rigidbody.isKinematic = true;
+
+            // Reset velocity to stop any residual movement
+            _rigidbody.velocity = Vector3.zero;
+            _rigidbody.angularVelocity = Vector3.zero;
+        }
+
         // Remove visual feedback
         if (objectRenderer != null && originalMaterial != null)
         {
             objectRenderer.material = originalMaterial;
         }
+
+        Debug.Log($"{gameObject.name} deselected - now kinematic");
     }
 
     private void Update()
@@ -100,6 +119,12 @@ public class ControllableObject : MonoBehaviour
 
     private void HandleAxialMode()
     {
+        // Ensure rotation is frozen in Axial mode
+        if (_rigidbody.constraints != RigidbodyConstraints.FreezeRotation)
+        {
+            _rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+        }
+
         Vector3 move = new Vector3(
             _joystick.Horizontal * _moveSpeed,
             0f,
@@ -111,23 +136,30 @@ public class ControllableObject : MonoBehaviour
         if (_isMovingDown) vertical -= _verticalMoveSpeed;
 
         Vector3 displacement = (move + Vector3.up * vertical) * Time.deltaTime;
+
+        // Use MovePosition for non-kinematic rigidbody
         _rigidbody.MovePosition(_rigidbody.position + displacement);
     }
 
     private void HandleRotaryMode()
     {
-        // Joystick controls: Vertical = Pitch (X-axis), Horizontal = Roll (Z-axis)
+        // Unfreeze rotation constraints for manual rotation
+        if (_rigidbody.constraints != RigidbodyConstraints.None)
+        {
+            _rigidbody.constraints = RigidbodyConstraints.None;
+        }
+
         float pitch = -_joystick.Vertical * _rotationSpeed * Time.deltaTime;
         float roll = _joystick.Horizontal * _rotationSpeed * Time.deltaTime;
 
-        // Buttons control Yaw (Y-axis)
         float yaw = 0f;
         if (_isMovingUp) yaw += _rotationSpeed * Time.deltaTime;
         if (_isMovingDown) yaw -= _rotationSpeed * Time.deltaTime;
 
-        // Apply rotation
         Vector3 eulerRotation = new Vector3(pitch, yaw, roll);
         Quaternion deltaRotation = Quaternion.Euler(eulerRotation);
+
+        // Use MoveRotation for non-kinematic rigidbody
         _rigidbody.MoveRotation(_rigidbody.rotation * deltaRotation);
     }
 
@@ -146,7 +178,6 @@ public class ControllableObject : MonoBehaviour
         }
     }
 
-    // Called by ObjectManager when toggle button is pressed
     public void ToggleMode()
     {
         if (!_isSelected) return;
@@ -157,7 +188,6 @@ public class ControllableObject : MonoBehaviour
         Debug.Log($"{gameObject.name} - Mode switched to: {(_isRotaryMode ? "Rotary" : "Axial")}");
     }
 
-    // Sync the UI button to match this object's current mode
     private void SyncModeButton()
     {
         if (modeToggle != null)

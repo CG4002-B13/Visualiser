@@ -100,20 +100,22 @@ public class ObjectManager : MonoBehaviour
         GameObject newObject = Instantiate(prefab, spawnPosition, Quaternion.identity);
         newObject.name = objectName;
 
-        // Ensure Rigidbody exists
+        // Configure Rigidbody - START AS KINEMATIC to prevent physics chaos
         Rigidbody rb = newObject.GetComponent<Rigidbody>();
         if (rb == null)
         {
             rb = newObject.AddComponent<Rigidbody>();
-            rb.useGravity = false;
-            rb.constraints = RigidbodyConstraints.None;
         }
-        else
-        {
-            // Ensure rotation isn't frozen
-            rb.constraints = RigidbodyConstraints.None;
-            rb.useGravity = false;
-        }
+
+        // CRITICAL: Start kinematic to prevent drift/spin on collision
+        rb.isKinematic = true;
+        rb.useGravity = false;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
+        // These will be used when object is selected (non-kinematic mode)
+        rb.drag = 5f;
+        rb.angularDrag = 10f;
 
         // Ensure collider exists
         if (newObject.GetComponent<Collider>() == null)
@@ -157,7 +159,7 @@ public class ObjectManager : MonoBehaviour
         currentlySelectedObject = obj.GetComponent<ControllableObject>();
         if (currentlySelectedObject != null)
         {
-            currentlySelectedObject.Select(); // This will reset to Axial mode and sync the button
+            currentlySelectedObject.Select(); // This will make it non-kinematic and reset to Axial mode
             Debug.Log($"Selected: {obj.name}");
         }
         else
