@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 [RequireComponent(typeof(Rigidbody))]
 public class ControllableObject : MonoBehaviour
@@ -25,6 +26,8 @@ public class ControllableObject : MonoBehaviour
     private Material originalMaterial;
     private Material highlightMaterial;
     private Renderer objectRenderer;
+
+    private Vector3 lastPosition; // Track position changes
 
     private void Awake()
     {
@@ -76,6 +79,8 @@ public class ControllableObject : MonoBehaviour
             objectRenderer.material = highlightMaterial;
         }
 
+        lastPosition = transform.position;
+
         SyncModeButton();
         Debug.Log($"{gameObject.name} selected - Mode: Axial");
     }
@@ -114,6 +119,16 @@ public class ControllableObject : MonoBehaviour
         else
         {
             HandleAxialMode();
+        }
+
+        // UPDATE UI if position changed
+        if (Vector3.Distance(transform.position, lastPosition) > 0.01f)
+        {
+            lastPosition = transform.position;
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.UpdateObjectCoordinates(transform.position);
+            }
         }
     }
 
@@ -185,6 +200,12 @@ public class ControllableObject : MonoBehaviour
         _isRotaryMode = !_isRotaryMode;
         SyncModeButton();
 
+        // UPDATE UI with new mode
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateObjectMode(_isRotaryMode ? "Rotary" : "Axial");
+        }
+
         Debug.Log($"{gameObject.name} - Mode switched to: {(_isRotaryMode ? "Rotary" : "Axial")}");
     }
 
@@ -192,10 +213,19 @@ public class ControllableObject : MonoBehaviour
     {
         if (modeToggle != null)
         {
-            Text buttonText = modeToggle.GetComponentInChildren<Text>();
-            if (buttonText != null)
+            // UPDATED: Check for both Text and TextMeshPro
+            Text legacyText = modeToggle.GetComponentInChildren<Text>();
+            TextMeshProUGUI tmpText = modeToggle.GetComponentInChildren<TextMeshProUGUI>();
+
+            string modeText = _isRotaryMode ? "Rotary" : "Axial";
+
+            if (tmpText != null)
             {
-                buttonText.text = _isRotaryMode ? "Rotary" : "Axial";
+                tmpText.text = modeText;
+            }
+            else if (legacyText != null)
+            {
+                legacyText.text = modeText;
             }
 
             UpdateButtonRotations();

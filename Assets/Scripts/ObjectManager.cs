@@ -160,6 +160,18 @@ public class ObjectManager : MonoBehaviour
         if (currentlySelectedObject != null)
         {
             currentlySelectedObject.Select(); // This will make it non-kinematic and reset to Axial mode
+
+            // UPDATE UI with selected object info
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.UpdateCurrentObject(obj.name);
+                UIManager.Instance.UpdateObjectMode("Axial"); // Always starts in Axial
+                UIManager.Instance.UpdateObjectCoordinates(obj.transform.position);
+
+                // SHOW GRID OUTLINE at the object's button position
+                UIManager.Instance.ShowGridOutline(obj.name);
+            }
+
             Debug.Log($"Selected: {obj.name}");
         }
         else
@@ -174,6 +186,13 @@ public class ObjectManager : MonoBehaviour
         {
             currentlySelectedObject.Deselect();
             currentlySelectedObject = null;
+
+            // CLEAR UI when nothing is selected
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ClearObjectInfo();
+            }
+
             Debug.Log("Deselected all objects");
         }
     }
@@ -203,6 +222,12 @@ public class ObjectManager : MonoBehaviour
 
             // Clear reference
             currentlySelectedObject = null;
+
+            // CLEAR UI when object is deleted
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ClearObjectInfo();
+            }
 
             // Destroy the object
             Destroy(objectToDelete);
