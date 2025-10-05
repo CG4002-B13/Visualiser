@@ -11,6 +11,7 @@
 /[Bb]uild/
 /[Bb]uilds/
 /[Bb]uild_v2/
+/[Bb]uild_v3/
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
