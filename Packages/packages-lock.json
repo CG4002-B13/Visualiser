@@ -1,5 +1,22 @@
 {
   "dependencies": {
+    "com.nianticlabs.lightship": {
+      "version": "https://github.com/niantic-lightship/ardk-upm.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.editorcoroutines": "1.0.0",
+        "com.unity.xr.arfoundation": "5.2.0",
+        "com.unity.xr.arcore": "5.2.0",
+        "com.unity.xr.arkit": "5.2.0",
+        "com.unity.xr.openxr": "1.6.0",
+        "com.unity.xr.core-utils": "2.1.0",
+        "com.unity.xr.management": "4.0.1",
+        "com.unity.nuget.newtonsoft-json": "3.2.1",
+        "com.unity.burst": "1.8.17"
+      },
+      "hash": "1f2596a5cd16619672a57c36b9b46ddf42fa59ef"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -18,6 +35,13 @@
     },
     "com.unity.collab-proxy": {
       "version": "2.9.3",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.device-simulator.devices": {
+      "version": "1.0.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {},
@@ -82,6 +106,13 @@
     "com.unity.mobile.android-logcat": {
       "version": "1.4.5",
       "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.nuget.newtonsoft-json": {
+      "version": "3.2.1",
+      "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
@@ -278,6 +309,18 @@
         "com.unity.modules.xr": "1.0.0",
         "com.unity.modules.subsystems": "1.0.0",
         "com.unity.xr.legacyinputhelpers": "2.1.7"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.openxr": {
+      "version": "1.14.3",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.inputsystem": "1.6.3",
+        "com.unity.xr.core-utils": "2.3.0",
+        "com.unity.xr.management": "4.4.0",
+        "com.unity.xr.legacyinputhelpers": "2.1.2"
       },
       "url": "https://packages.unity.com"
     },
