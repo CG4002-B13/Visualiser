@@ -14,8 +14,8 @@ public class ObjectManager : MonoBehaviour
     [SerializeField] private Button modeToggle;
 
     [Header("Settings")]
-    [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float verticalMoveSpeed = 3f;
+    [SerializeField] private float moveSpeed = 3f;
+    [SerializeField] private float verticalMoveSpeed = 2f;
     [SerializeField] private float rotationSpeed = 120f;
 
     [Header("Spawn Settings")]
