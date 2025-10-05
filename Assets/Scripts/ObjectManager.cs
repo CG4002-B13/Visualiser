@@ -235,4 +235,40 @@ public class ObjectManager : MonoBehaviour
             Debug.Log($"Deleted object: {objectName}");
         }
     }
+
+    public void HideAllObjects()
+    {
+        foreach (var kvp in instantiatedObjects)
+        {
+            if (kvp.Value != null)
+            {
+                // Hide renderers but keep objects active to preserve state
+                Renderer[] renderers = kvp.Value.GetComponentsInChildren<Renderer>();
+                foreach (Renderer renderer in renderers)
+                {
+                    renderer.enabled = false;
+                }
+            }
+        }
+
+        Debug.Log("All objects hidden");
+    }
+
+    public void ShowAllObjects()
+    {
+        foreach (var kvp in instantiatedObjects)
+        {
+            if (kvp.Value != null)
+            {
+                // Show renderers
+                Renderer[] renderers = kvp.Value.GetComponentsInChildren<Renderer>();
+                foreach (Renderer renderer in renderers)
+                {
+                    renderer.enabled = true;
+                }
+            }
+        }
+
+        Debug.Log("All objects shown");
+    }
 }
