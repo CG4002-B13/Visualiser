@@ -52,6 +52,9 @@ public class DebugViewController : MonoBehaviour
 
         // Initialize connection buttons state
         UpdateConnectionButtons(false);
+
+        // Log initial platform information
+        LogPlatformInfo();
     }
 
     private void OnDestroy()
@@ -62,7 +65,25 @@ public class DebugViewController : MonoBehaviour
     public void OnTabOpened()
     {
         // Called when this tab is opened
-        Debug.Log("Debug Viewer Opened");
+        AddDebugMessage("Debug Viewer Opened");
+    }
+
+    private void LogPlatformInfo()
+    {
+        AddDebugMessage($"Platform: {Application.platform}");
+
+#if UNITY_IOS && !UNITY_EDITOR
+        AddDebugMessage("Running on iOS device - mTLS WebSocket available");
+#elif UNITY_EDITOR
+        AddDebugMessage("Running in Unity Editor - mTLS WebSocket NOT available");
+#else
+        AddDebugMessage($"Running on {Application.platform} - mTLS WebSocket NOT available");
+#endif
+
+        if (wsClient == null)
+        {
+            AddDebugMessage("WARNING: WS_Client reference is not assigned!");
+        }
     }
 
     // ===== DEBUG CONTROL FUNCTIONS =====
@@ -71,31 +92,44 @@ public class DebugViewController : MonoBehaviour
     {
         AddDebugMessage("=== Connection Attempt Started ===");
 
+        if (wsClient == null)
+        {
+            AddDebugMessage("ERROR: WS_Client reference is not assigned");
+            UpdateConnectionButtons(false);
+            return;
+        }
+
         if (connectButton != null)
         {
             connectButton.interactable = false;
         }
-        if (wsClient != null)
-        {
-            wsClient.ConnectWebSocket();
-        }
+
+        // Let WS_Client handle platform-specific logic and messaging
+        wsClient.ConnectWebSocket();
     }
 
     public void OnDisconnectClicked()
     {
         AddDebugMessage("=== Manual Disconnect Requested ===");
-        if (wsClient != null)
+
+        if (wsClient == null)
         {
-            wsClient.ManualDisconnect();
+            AddDebugMessage("ERROR: WS_Client reference is not assigned");
+            return;
         }
+
+        wsClient.ManualDisconnect();
     }
 
     public void OnSendPingClicked()
     {
-        if (wsClient != null)
+        if (wsClient == null)
         {
-            wsClient.SendPingMessage();
+            AddDebugMessage("ERROR: WS_Client reference is not assigned");
+            return;
         }
+
+        wsClient.SendPingMessage();
     }
 
     public static void UpdateConnectionButtons(bool isConnected)
@@ -118,10 +152,28 @@ public class DebugViewController : MonoBehaviour
 
     public static void AddDebugMessage(string message)
     {
-        if (instance == null) return;
+        if (instance == null)
+        {
+            // Fallback to Unity console if instance doesn't exist yet
+            Debug.Log($"[DebugView] {message}");
+            return;
+        }
 
         string timestamp = System.DateTime.Now.ToString("HH:mm:ss.fff");
         string formattedMsg = $"[{timestamp}] {message}";
+
+        // Validate required references
+        if (instance.debugContentTransform == null)
+        {
+            Debug.LogError("DebugViewController: debugContentTransform is not assigned!");
+            return;
+        }
+
+        if (instance.debugOutputPrefab == null)
+        {
+            Debug.LogError("DebugViewController: debugOutputPrefab is not assigned!");
+            return;
+        }
 
         // Create new DebugOutput GameObject
         GameObject newLogEntry = Instantiate(instance.debugOutputPrefab, instance.debugContentTransform);
@@ -134,6 +186,10 @@ public class DebugViewController : MonoBehaviour
         if (textComponent != null)
         {
             textComponent.text = formattedMsg;
+        }
+        else
+        {
+            Debug.LogError("DebugViewController: DebugOutputPrefab does not have TextMeshProUGUI component!");
         }
 
         // Add to queue
