@@ -21,7 +21,6 @@ public class StageManager : MonoBehaviour
     [SerializeField] private GameObject selectionPane;
     [SerializeField] private GameObject upButton;
     [SerializeField] private GameObject downButton;
-    [SerializeField] private GameObject toggleButton;
     [SerializeField] private GameObject gridOutline;
 
     [Header("Object Detection UI")]
@@ -92,7 +91,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(selectionPane, true);
         SetUIActive(upButton, true);
         SetUIActive(downButton, true);
-        SetUIActive(toggleButton, true);
 
         // GridOutline visibility is managed by UIManager based on selection
         // Just ensure it's not force-hidden
@@ -128,7 +126,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(selectionPane, false);
         SetUIActive(upButton, false);
         SetUIActive(downButton, false);
-        SetUIActive(toggleButton, false);
         SetUIActive(gridOutline, false);
 
         // Enable Object Detection UI
