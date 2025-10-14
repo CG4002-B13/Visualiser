@@ -21,7 +21,7 @@ public class ObjectManager : MonoBehaviour
     [SerializeField] private float rotationSpeed = 120f;
 
     [Header("Spawn Settings")]
-    [SerializeField] private float spawnDistance = 2f;
+    [SerializeField] private float spawnDistance = 5f;
 
     private Dictionary<string, GameObject> instantiatedObjects = new Dictionary<string, GameObject>();
     private ControllableObject currentlySelectedObject;
