@@ -54,62 +54,62 @@ public class WS_Client : MonoBehaviour
     private void Start()
     {
         // Don't auto-connect - let debug panel control this
-        DebugPanelController.AddDebugMessage("WS_Client initialized. Ready to connect.");
+        DebugViewController.AddDebugMessage("WS_Client initialized. Ready to connect.");
     }
 
     public void ConnectWebSocket()
     {
 #if UNITY_IOS && !UNITY_EDITOR
-    if (isConnected)
-    {
-        DebugPanelController.AddDebugMessage("Already connected!");
-        return;
-    }
-
-    try
-    {
-        // Direct access - no copying needed on iOS
-        string certPath = System.IO.Path.Combine(Application.streamingAssetsPath, certificateFileName);
-        
-        DebugPanelController.AddDebugMessage($"Certificate path: {certPath}");
-        DebugPanelController.AddDebugMessage($"Looking for file: {certificateFileName}");
-        
-        // Verify the file exists
-        if (!System.IO.File.Exists(certPath))
+        if (isConnected)
         {
-            DebugPanelController.AddDebugMessage($"ERROR: Certificate file not found at: {certPath}");
-            DebugPanelController.UpdateConnectionButtons(false);
+            DebugViewController.AddDebugMessage("Already connected!");
             return;
         }
-        
-        DebugPanelController.AddDebugMessage($"Certificate found! Creating WebSocket...");
-        wsInstance = _CreateWebSocket(serverUrl, certPath, certificatePassword);
-        
-        if (wsInstance != IntPtr.Zero)
+
+        try
         {
-            _SetMessageCallback(wsInstance, OnMessageReceived);
-            _SetErrorCallback(wsInstance, OnError);
-            _SetConnectCallback(wsInstance, OnConnected);
+            // Direct access - no copying needed on iOS
+            string certPath = System.IO.Path.Combine(Application.streamingAssetsPath, certificateFileName);
             
-            DebugPanelController.AddDebugMessage("Connecting...");
-            _ConnectWebSocket(wsInstance);
+            DebugViewController.AddDebugMessage($"Certificate path: {certPath}");
+            DebugViewController.AddDebugMessage($"Looking for file: {certificateFileName}");
+            
+            // Verify the file exists
+            if (!System.IO.File.Exists(certPath))
+            {
+                DebugViewController.AddDebugMessage($"ERROR: Certificate file not found at: {certPath}");
+                DebugViewController.UpdateConnectionButtons(false);
+                return;
+            }
+            
+            DebugViewController.AddDebugMessage($"Certificate found! Creating WebSocket...");
+            wsInstance = _CreateWebSocket(serverUrl, certPath, certificatePassword);
+            
+            if (wsInstance != IntPtr.Zero)
+            {
+                _SetMessageCallback(wsInstance, OnMessageReceived);
+                _SetErrorCallback(wsInstance, OnError);
+                _SetConnectCallback(wsInstance, OnConnected);
+                
+                DebugViewController.AddDebugMessage("Connecting...");
+                _ConnectWebSocket(wsInstance);
+            }
+            else
+            {
+                DebugViewController.AddDebugMessage("ERROR: Failed to create WebSocket instance");
+                DebugViewController.UpdateConnectionButtons(false);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            DebugPanelController.AddDebugMessage("ERROR: Failed to create WebSocket instance");
-            DebugPanelController.UpdateConnectionButtons(false);
+            DebugViewController.AddDebugMessage($"Exception: {ex.Message}");
+            DebugViewController.UpdateConnectionButtons(false);
         }
-    }
-    catch (Exception ex)
-    {
-        DebugPanelController.AddDebugMessage($"Exception: {ex.Message}");
-        DebugPanelController.UpdateConnectionButtons(false);
-    }
 #else
-        DebugPanelController.AddDebugMessage("Native WebSocket only works on iOS device");
+        DebugViewController.AddDebugMessage("Native WebSocket only works on iOS device");
+        DebugViewController.UpdateConnectionButtons(false);
 #endif
     }
-
 
     public void ManualDisconnect()
     {
@@ -119,9 +119,11 @@ public class WS_Client : MonoBehaviour
             _CloseWebSocket(wsInstance);
             wsInstance = IntPtr.Zero;
             isConnected = false;
-            DebugPanelController.AddDebugMessage("WebSocket disconnected");
-            DebugPanelController.UpdateConnectionButtons(false);
+            DebugViewController.AddDebugMessage("WebSocket disconnected");
+            DebugViewController.UpdateConnectionButtons(false);
         }
+#else
+        DebugViewController.AddDebugMessage("Disconnect only available on iOS device");
 #endif
     }
 
@@ -136,14 +138,14 @@ public class WS_Client : MonoBehaviour
         if (wsInstance != IntPtr.Zero && isConnected)
         {
             _SendMessage(wsInstance, message);
-            DebugPanelController.AddDebugMessage($"SENT: {message}");
+            DebugViewController.AddDebugMessage($"SENT: {message}");
         }
         else
         {
-            DebugPanelController.AddDebugMessage("Cannot send - not connected");
+            DebugViewController.AddDebugMessage("Cannot send - not connected");
         }
 #else
-        DebugPanelController.AddDebugMessage($"[Editor] Would send: {message}");
+        DebugViewController.AddDebugMessage($"[Editor] Would send: {message}");
 #endif
     }
 
@@ -154,7 +156,7 @@ public class WS_Client : MonoBehaviour
         if (instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
-                DebugPanelController.AddDebugMessage($"RECEIVED: {message}");
+                DebugViewController.AddDebugMessage($"RECEIVED: {message}");
             });
         }
     }
@@ -165,9 +167,9 @@ public class WS_Client : MonoBehaviour
         if (instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
-                DebugPanelController.AddDebugMessage($"ERROR: {error}");
+                DebugViewController.AddDebugMessage($"ERROR: {error}");
                 instance.isConnected = false;
-                DebugPanelController.UpdateConnectionButtons(false);
+                DebugViewController.UpdateConnectionButtons(false);
             });
         }
     }
@@ -178,9 +180,9 @@ public class WS_Client : MonoBehaviour
         if (instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
-                DebugPanelController.AddDebugMessage("✓ WebSocket connected successfully!");
+                DebugViewController.AddDebugMessage("✓ WebSocket connected successfully!");
                 instance.isConnected = true;
-                DebugPanelController.UpdateConnectionButtons(true);
+                DebugViewController.UpdateConnectionButtons(true);
             });
         }
     }
