@@ -12,7 +12,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI connectionStatusValue;
     [SerializeField] private TextMeshProUGUI currentStageValue;
     [SerializeField] private TextMeshProUGUI currentObjectValue;
-    [SerializeField] private TextMeshProUGUI objectModeValue;
     [SerializeField] private TextMeshProUGUI objectCoordinatesValue;
 
     [Header("Selection Outline")]
@@ -53,7 +52,6 @@ public class UIManager : MonoBehaviour
         UpdateConnectionStatus("Unconnected");
         UpdateCurrentStage("Object Placement");
         UpdateCurrentObject("");
-        UpdateObjectMode("");
         ClearCoordinates();
 
         // Hide the grid outline on start
@@ -99,14 +97,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    public void UpdateObjectMode(string mode)
-    {
-        if (objectModeValue != null)
-        {
-            objectModeValue.text = mode;
-        }
-    }
-
     public void UpdateObjectCoordinates(Vector3 position)
     {
         if (objectCoordinatesValue != null)
@@ -126,7 +116,6 @@ public class UIManager : MonoBehaviour
     public void ClearObjectInfo()
     {
         UpdateCurrentObject("");
-        UpdateObjectMode("");
         ClearCoordinates();
         HideGridOutline();
     }
