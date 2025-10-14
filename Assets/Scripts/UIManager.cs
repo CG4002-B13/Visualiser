@@ -22,13 +22,13 @@ public class UIManager : MonoBehaviour
     // Hardcoded position values for each object button
     private Dictionary<string, float> buttonPositions = new Dictionary<string, float>()
     {
-        { "Table", -343f },
-        { "Chair", -254f },
-        { "Lamp", -165f },
-        { "TV Console", -76f },
-        { "Bed", 13f },
-        { "Plant", 102f },
-        { "Sofa", 191f }
+        { "Table", -268f },
+        { "Chair", -179f },
+        { "Lamp", -90f },
+        { "TV Console", -1f },
+        { "Bed", 88f },
+        { "Plant", 177f },
+        { "Sofa", 266f }
     };
 
     private float targetPosX;
