@@ -8,14 +8,16 @@ public class ObjectManager : MonoBehaviour
     public static ObjectManager Instance { get; private set; }
 
     [Header("Control References")]
-    [SerializeField] private FixedJoystick joystick;
-    [SerializeField] private Button upButton;
-    [SerializeField] private Button downButton;
-    [SerializeField] private Button modeToggle;
+    [SerializeField] private FixedJoystick axialJoystick;
+    [SerializeField] private FixedJoystick rotaryJoystick;
+    [SerializeField] private Button zIncreaseButton;
+    [SerializeField] private Button zDecreaseButton;
+    [SerializeField] private Button yawLeftButton;
+    [SerializeField] private Button yawRightButton;
 
     [Header("Settings")]
     [SerializeField] private float moveSpeed = 3f;
-    [SerializeField] private float verticalMoveSpeed = 2f;
+    [SerializeField] private float depthMoveSpeed = 2f;
     [SerializeField] private float rotationSpeed = 120f;
 
     [Header("Spawn Settings")]
@@ -37,39 +39,22 @@ public class ObjectManager : MonoBehaviour
         }
 
         ValidateReferences();
-        SetupModeToggleButton();
     }
 
     private void ValidateReferences()
     {
-        if (joystick == null)
-            Debug.LogError("ObjectManager: Joystick reference is missing!");
-        if (upButton == null)
-            Debug.LogError("ObjectManager: UpButton reference is missing!");
-        if (downButton == null)
-            Debug.LogError("ObjectManager: DownButton reference is missing!");
-        if (modeToggle == null)
-            Debug.LogError("ObjectManager: ModeToggle reference is missing!");
-    }
-
-    private void SetupModeToggleButton()
-    {
-        if (modeToggle != null)
-        {
-            // Clear any existing listeners to prevent duplicates
-            modeToggle.onClick.RemoveAllListeners();
-
-            // Add a single listener that delegates to the currently selected object
-            modeToggle.onClick.AddListener(OnModeTogglePressed);
-        }
-    }
-
-    private void OnModeTogglePressed()
-    {
-        if (currentlySelectedObject != null)
-        {
-            currentlySelectedObject.ToggleMode();
-        }
+        if (axialJoystick == null)
+            Debug.LogError("ObjectManager: Axial Joystick reference is missing!");
+        if (rotaryJoystick == null)
+            Debug.LogError("ObjectManager: Rotary Joystick reference is missing!");
+        if (zIncreaseButton == null)
+            Debug.LogError("ObjectManager: ZIncreaseButton reference is missing!");
+        if (zDecreaseButton == null)
+            Debug.LogError("ObjectManager: ZDecreaseButton reference is missing!");
+        if (yawLeftButton == null)
+            Debug.LogError("ObjectManager: YawLeftButton reference is missing!");
+        if (yawRightButton == null)
+            Debug.LogError("ObjectManager: YawRightButton reference is missing!");
     }
 
     public void HandleObjectButton(string objectName, GameObject prefab)
@@ -95,45 +80,38 @@ public class ObjectManager : MonoBehaviour
 
     private void InstantiateObject(string objectName, GameObject prefab)
     {
-        // Spawn in front of camera
         Vector3 spawnPosition = Camera.main.transform.position + Camera.main.transform.forward * spawnDistance;
         GameObject newObject = Instantiate(prefab, spawnPosition, Quaternion.identity);
         newObject.name = objectName;
 
-        // Configure Rigidbody - START AS KINEMATIC to prevent physics chaos
         Rigidbody rb = newObject.GetComponent<Rigidbody>();
-        if (rb == null)
-        {
-            rb = newObject.AddComponent<Rigidbody>();
-        }
-
-        // CRITICAL: Start kinematic to prevent drift/spin on collision
+        if (rb == null) rb = newObject.AddComponent<Rigidbody>();
         rb.isKinematic = true;
         rb.useGravity = false;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-
-        // These will be used when object is selected (non-kinematic mode)
         rb.drag = 5f;
         rb.angularDrag = 10f;
 
-        // Ensure collider exists
         if (newObject.GetComponent<Collider>() == null)
         {
             BoxCollider collider = newObject.AddComponent<BoxCollider>();
             Debug.LogWarning($"Added BoxCollider to {objectName} - consider adding proper collider to prefab");
         }
 
-        // Add ControllableObject component if it doesn't exist
         ControllableObject controllable = newObject.GetComponent<ControllableObject>();
         if (controllable == null)
         {
             controllable = newObject.AddComponent<ControllableObject>();
         }
 
-        // Initialize the controllable object
-        controllable.Initialize(joystick, upButton, downButton, modeToggle,
-                               moveSpeed, verticalMoveSpeed, rotationSpeed);
+        // Pass both joysticks and all four buttons
+        controllable.Initialize(
+            axialJoystick, rotaryJoystick,
+            zIncreaseButton, zDecreaseButton,
+            yawLeftButton, yawRightButton,
+            moveSpeed, depthMoveSpeed, rotationSpeed
+        );
 
         instantiatedObjects.Add(objectName, newObject);
         SelectObject(newObject);
@@ -149,26 +127,20 @@ public class ObjectManager : MonoBehaviour
             return;
         }
 
-        // Deselect current object
         if (currentlySelectedObject != null)
         {
             currentlySelectedObject.Deselect();
         }
 
-        // Select new object
         currentlySelectedObject = obj.GetComponent<ControllableObject>();
         if (currentlySelectedObject != null)
         {
-            currentlySelectedObject.Select(); // This will make it non-kinematic and reset to Axial mode
+            currentlySelectedObject.Select();
 
-            // UPDATE UI with selected object info
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.UpdateCurrentObject(obj.name);
-                UIManager.Instance.UpdateObjectMode("Axial"); // Always starts in Axial
                 UIManager.Instance.UpdateObjectCoordinates(obj.transform.position);
-
-                // SHOW GRID OUTLINE at the object's button position
                 UIManager.Instance.ShowGridOutline(obj.name);
             }
 
@@ -187,12 +159,10 @@ public class ObjectManager : MonoBehaviour
             currentlySelectedObject.Deselect();
             currentlySelectedObject = null;
 
-            // CLEAR UI when nothing is selected
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.ClearObjectInfo();
             }
-
             Debug.Log("Deselected all objects");
         }
     }
@@ -214,24 +184,19 @@ public class ObjectManager : MonoBehaviour
             string objectName = currentlySelectedObject.gameObject.name;
             GameObject objectToDelete = currentlySelectedObject.gameObject;
 
-            // Remove from dictionary
             if (instantiatedObjects.ContainsKey(objectName))
             {
                 instantiatedObjects.Remove(objectName);
             }
 
-            // Clear reference
             currentlySelectedObject = null;
 
-            // CLEAR UI when object is deleted
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.ClearObjectInfo();
             }
 
-            // Destroy the object
             Destroy(objectToDelete);
-
             Debug.Log($"Deleted object: {objectName}");
         }
     }
@@ -242,7 +207,6 @@ public class ObjectManager : MonoBehaviour
         {
             if (kvp.Value != null)
             {
-                // Hide renderers but keep objects active to preserve state
                 Renderer[] renderers = kvp.Value.GetComponentsInChildren<Renderer>();
                 foreach (Renderer renderer in renderers)
                 {
@@ -250,7 +214,6 @@ public class ObjectManager : MonoBehaviour
                 }
             }
         }
-
         Debug.Log("All objects hidden");
     }
 
@@ -260,7 +223,6 @@ public class ObjectManager : MonoBehaviour
         {
             if (kvp.Value != null)
             {
-                // Show renderers
                 Renderer[] renderers = kvp.Value.GetComponentsInChildren<Renderer>();
                 foreach (Renderer renderer in renderers)
                 {
@@ -268,7 +230,6 @@ public class ObjectManager : MonoBehaviour
                 }
             }
         }
-
         Debug.Log("All objects shown");
     }
 }
