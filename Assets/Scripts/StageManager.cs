@@ -10,28 +10,40 @@ public class StageManager : MonoBehaviour
     public enum Stage
     {
         ObjectPlacement,
-        ObjectDetection
+        ObjectDetection,
+        Settings
     }
 
     [Header("Current Stage")]
     [SerializeField] private Stage currentStage = Stage.ObjectPlacement;
+    private Stage previousStage = Stage.ObjectPlacement; // Store previous stage for returning from settings
 
     [Header("Object Placement UI")]
-    [SerializeField] private GameObject fixedJoystick;
+    [SerializeField] private GameObject axialJoystick;
+    [SerializeField] private GameObject rotaryJoystick;
     [SerializeField] private GameObject selectionPane;
-    [SerializeField] private GameObject upButton;
-    [SerializeField] private GameObject downButton;
+    [SerializeField] private GameObject yawLeftButton;
+    [SerializeField] private GameObject yawRightButton;
+    [SerializeField] private GameObject zIncreaseButton;
+    [SerializeField] private GameObject zDecreaseButton;
     [SerializeField] private GameObject gridOutline;
 
     [Header("Object Detection UI")]
     [SerializeField] private GameObject boundingBoxOverlay;
 
-    [Header("Stage Toggle Button")]
-    [SerializeField] private Button objectDetectionButton;
+    [Header("Common UI (visible in ObjectPlacement and ObjectDetection)")]
+    [SerializeField] private GameObject topPane;
+    [SerializeField] private GameObject objectDetectionButton;
+    [SerializeField] private GameObject screenshotButton;
+    [SerializeField] private GameObject settingsGearButton;
+
+    [Header("Settings Panel")]
+    [SerializeField] private GameObject settingsPanel;
 
     [Header("Managers")]
     [SerializeField] private ObjectDetectionSample objectDetectionSample;
     [SerializeField] private ObjectManager objectManager;
+    [SerializeField] private SettingsPanelController settingsPanelController;
 
     private void Awake()
     {
@@ -48,10 +60,24 @@ public class StageManager : MonoBehaviour
 
     private void Start()
     {
-        // Setup button listener
+        // Setup button listener for Object Detection toggle
         if (objectDetectionButton != null)
         {
-            objectDetectionButton.onClick.AddListener(ToggleStage);
+            Button odButton = objectDetectionButton.GetComponent<Button>();
+            if (odButton != null)
+            {
+                odButton.onClick.AddListener(ToggleStage);
+            }
+        }
+
+        // Setup button listener for Settings Gear
+        if (settingsGearButton != null)
+        {
+            Button settingsButton = settingsGearButton.GetComponent<Button>();
+            if (settingsButton != null)
+            {
+                settingsButton.onClick.AddListener(OpenSettings);
+            }
         }
 
         // Start in Object Placement stage
@@ -64,10 +90,26 @@ public class StageManager : MonoBehaviour
         {
             SetStage(Stage.ObjectDetection);
         }
-        else
+        else if (currentStage == Stage.ObjectDetection)
         {
             SetStage(Stage.ObjectPlacement);
         }
+    }
+
+    public void OpenSettings()
+    {
+        // Store the current stage so we can return to it
+        if (currentStage != Stage.Settings)
+        {
+            previousStage = currentStage;
+        }
+        SetStage(Stage.Settings);
+    }
+
+    public void CloseSettings()
+    {
+        // Return to the previous stage
+        SetStage(previousStage);
     }
 
     public void SetStage(Stage newStage)
@@ -78,25 +120,40 @@ public class StageManager : MonoBehaviour
         {
             ActivateObjectPlacementStage();
         }
-        else
+        else if (currentStage == Stage.ObjectDetection)
         {
             ActivateObjectDetectionStage();
+        }
+        else if (currentStage == Stage.Settings)
+        {
+            ActivateSettingsStage();
         }
     }
 
     private void ActivateObjectPlacementStage()
     {
         // Enable Object Placement UI
-        SetUIActive(fixedJoystick, true);
+        SetUIActive(axialJoystick, true);
+        SetUIActive(rotaryJoystick, true);
         SetUIActive(selectionPane, true);
-        SetUIActive(upButton, true);
-        SetUIActive(downButton, true);
+        SetUIActive(yawLeftButton, true);
+        SetUIActive(yawRightButton, true);
+        SetUIActive(zIncreaseButton, true);
+        SetUIActive(zDecreaseButton, true);
 
         // GridOutline visibility is managed by UIManager based on selection
-        // Just ensure it's not force-hidden
 
         // Disable Object Detection UI
         SetUIActive(boundingBoxOverlay, false);
+
+        // Enable Common UI
+        SetUIActive(topPane, true);
+        SetUIActive(objectDetectionButton, true);
+        SetUIActive(screenshotButton, true);
+        SetUIActive(settingsGearButton, true);
+
+        // Disable Settings Panel
+        SetUIActive(settingsPanel, false);
 
         // Stop object detection
         if (objectDetectionSample != null)
@@ -122,14 +179,26 @@ public class StageManager : MonoBehaviour
     private void ActivateObjectDetectionStage()
     {
         // Disable Object Placement UI
-        SetUIActive(fixedJoystick, false);
+        SetUIActive(axialJoystick, false);
+        SetUIActive(rotaryJoystick, false);
         SetUIActive(selectionPane, false);
-        SetUIActive(upButton, false);
-        SetUIActive(downButton, false);
+        SetUIActive(yawLeftButton, false);
+        SetUIActive(yawRightButton, false);
+        SetUIActive(zIncreaseButton, false);
+        SetUIActive(zDecreaseButton, false);
         SetUIActive(gridOutline, false);
 
         // Enable Object Detection UI
         SetUIActive(boundingBoxOverlay, true);
+
+        // Enable Common UI
+        SetUIActive(topPane, true);
+        SetUIActive(objectDetectionButton, true);
+        SetUIActive(screenshotButton, true);
+        SetUIActive(settingsGearButton, true);
+
+        // Disable Settings Panel
+        SetUIActive(settingsPanel, false);
 
         // Start object detection
         if (objectDetectionSample != null)
@@ -154,6 +223,54 @@ public class StageManager : MonoBehaviour
         Debug.Log("Switched to Object Detection Stage");
     }
 
+    private void ActivateSettingsStage()
+    {
+        // Disable Object Placement UI
+        SetUIActive(axialJoystick, false);
+        SetUIActive(rotaryJoystick, false);
+        SetUIActive(selectionPane, false);
+        SetUIActive(yawLeftButton, false);
+        SetUIActive(yawRightButton, false);
+        SetUIActive(zIncreaseButton, false);
+        SetUIActive(zDecreaseButton, false);
+        SetUIActive(gridOutline, false);
+
+        // Disable Object Detection UI
+        SetUIActive(boundingBoxOverlay, false);
+
+        // Disable Common UI (except settings gear - will be hidden by settings panel)
+        SetUIActive(topPane, false);
+        SetUIActive(objectDetectionButton, false);
+        SetUIActive(screenshotButton, false);
+        SetUIActive(settingsGearButton, false);
+
+        // Enable Settings Panel
+        SetUIActive(settingsPanel, true);
+
+        // Stop object detection if it was running
+        if (objectDetectionSample != null)
+        {
+            objectDetectionSample.enabled = false;
+        }
+
+        // Save object data if needed (ObjectManager should maintain state automatically)
+        // Objects remain in their current visibility state until we return
+
+        // Initialize settings panel to show default tab (SettingsMenu)
+        if (settingsPanelController != null)
+        {
+            settingsPanelController.ShowSettingsTab();
+        }
+
+        // Update UI Manager
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateCurrentStage("Settings");
+        }
+
+        Debug.Log("Switched to Settings Stage");
+    }
+
     private void SetUIActive(GameObject uiElement, bool active)
     {
         if (uiElement != null)
@@ -176,5 +293,9 @@ public class StageManager : MonoBehaviour
     {
         return currentStage == Stage.ObjectDetection;
     }
-}
 
+    public bool IsSettingsStage()
+    {
+        return currentStage == Stage.Settings;
+    }
+}
