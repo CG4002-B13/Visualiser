@@ -16,7 +16,7 @@ public class StageManager : MonoBehaviour
 
     [Header("Current Stage")]
     [SerializeField] private Stage currentStage = Stage.ObjectPlacement;
-    private Stage previousStage = Stage.ObjectPlacement; // Store previous stage for returning from settings
+    private Stage previousStage = Stage.ObjectPlacement;
 
     [Header("Object Placement UI")]
     [SerializeField] private GameObject axialJoystick;
@@ -26,7 +26,8 @@ public class StageManager : MonoBehaviour
     [SerializeField] private GameObject yawRightButton;
     [SerializeField] private GameObject zIncreaseButton;
     [SerializeField] private GameObject zDecreaseButton;
-    [SerializeField] private GameObject gridOutline;
+    // REMOVED: gridOutline reference - UIManager handles this
+    [SerializeField] private GameObject deleteButton;
 
     [Header("Object Detection UI")]
     [SerializeField] private GameObject boundingBoxOverlay;
@@ -141,7 +142,8 @@ public class StageManager : MonoBehaviour
         SetUIActive(zIncreaseButton, true);
         SetUIActive(zDecreaseButton, true);
 
-        // GridOutline visibility is managed by UIManager based on selection
+        // GridOutline and DeleteButton visibility are managed by UIManager based on selection
+        // Don't touch them here
 
         // Disable Object Detection UI
         SetUIActive(boundingBoxOverlay, false);
@@ -186,7 +188,11 @@ public class StageManager : MonoBehaviour
         SetUIActive(yawRightButton, false);
         SetUIActive(zIncreaseButton, false);
         SetUIActive(zDecreaseButton, false);
-        SetUIActive(gridOutline, false);
+
+        // FIXED: Don't force-hide gridOutline - let UIManager handle it
+        // REMOVED: SetUIActive(gridOutline, false);
+
+        SetUIActive(deleteButton, false);
 
         // Enable Object Detection UI
         SetUIActive(boundingBoxOverlay, true);
@@ -210,14 +216,14 @@ public class StageManager : MonoBehaviour
         if (objectManager != null)
         {
             objectManager.HideAllObjects();
-            objectManager.DeselectAll(); // Deselect current object
+            objectManager.DeselectAll(); // This will call UIManager to hide gridOutline
         }
 
         // Update UI Manager
         if (UIManager.Instance != null)
         {
             UIManager.Instance.UpdateCurrentStage("Object Detection");
-            UIManager.Instance.ClearObjectInfo(); // Clear object-specific info
+            UIManager.Instance.ClearObjectInfo(); // This also hides the grid outline properly
         }
 
         Debug.Log("Switched to Object Detection Stage");
@@ -233,12 +239,16 @@ public class StageManager : MonoBehaviour
         SetUIActive(yawRightButton, false);
         SetUIActive(zIncreaseButton, false);
         SetUIActive(zDecreaseButton, false);
-        SetUIActive(gridOutline, false);
+
+        // FIXED: Don't force-hide gridOutline - let UIManager handle it
+        // REMOVED: SetUIActive(gridOutline, false);
+
+        SetUIActive(deleteButton, false);
 
         // Disable Object Detection UI
         SetUIActive(boundingBoxOverlay, false);
 
-        // Disable Common UI (except settings gear - will be hidden by settings panel)
+        // Disable Common UI
         SetUIActive(topPane, false);
         SetUIActive(objectDetectionButton, false);
         SetUIActive(screenshotButton, false);
@@ -253,10 +263,13 @@ public class StageManager : MonoBehaviour
             objectDetectionSample.enabled = false;
         }
 
-        // Save object data if needed (ObjectManager should maintain state automatically)
-        // Objects remain in their current visibility state until we return
+        // Deselect any selected objects before entering settings
+        if (objectManager != null)
+        {
+            objectManager.DeselectAll(); // This will hide gridOutline via UIManager
+        }
 
-        // Initialize settings panel to show default tab (SettingsMenu)
+        // Initialize settings panel to show default tab
         if (settingsPanelController != null)
         {
             settingsPanelController.ShowSettingsTab();

@@ -142,6 +142,7 @@ public class ObjectManager : MonoBehaviour
                 UIManager.Instance.UpdateCurrentObject(obj.name);
                 UIManager.Instance.UpdateObjectCoordinates(obj.transform.position);
                 UIManager.Instance.ShowGridOutline(obj.name);
+                UIManager.Instance.ShowDeleteButton(); // NEW: Show delete button when object is selected
             }
 
             Debug.Log($"Selected: {obj.name}");
@@ -162,6 +163,7 @@ public class ObjectManager : MonoBehaviour
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.ClearObjectInfo();
+                UIManager.Instance.HideDeleteButton(); // NEW: Hide delete button when nothing is selected
             }
             Debug.Log("Deselected all objects");
         }
@@ -177,28 +179,44 @@ public class ObjectManager : MonoBehaviour
         return instantiatedObjects;
     }
 
+    // NEW: Updated delete method with better safety checks
     public void DeleteSelectedObject()
     {
-        if (currentlySelectedObject != null)
+        if (currentlySelectedObject == null)
         {
-            string objectName = currentlySelectedObject.gameObject.name;
-            GameObject objectToDelete = currentlySelectedObject.gameObject;
-
-            if (instantiatedObjects.ContainsKey(objectName))
-            {
-                instantiatedObjects.Remove(objectName);
-            }
-
-            currentlySelectedObject = null;
-
-            if (UIManager.Instance != null)
-            {
-                UIManager.Instance.ClearObjectInfo();
-            }
-
-            Destroy(objectToDelete);
-            Debug.Log($"Deleted object: {objectName}");
+            Debug.LogWarning("ObjectManager: No object selected to delete");
+            return;
         }
+
+        string objectName = currentlySelectedObject.gameObject.name;
+        GameObject objectToDelete = currentlySelectedObject.gameObject;
+
+        // Remove from dictionary first
+        if (instantiatedObjects.ContainsKey(objectName))
+        {
+            instantiatedObjects.Remove(objectName);
+        }
+
+        // Clear selection reference
+        currentlySelectedObject = null;
+
+        // Update UI
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ClearObjectInfo();
+            UIManager.Instance.HideDeleteButton();
+        }
+
+        // Destroy the GameObject
+        Destroy(objectToDelete);
+
+        Debug.Log($"Deleted object: {objectName}");
+    }
+
+    // NEW: Check if there's a selected object
+    public bool HasSelectedObject()
+    {
+        return currentlySelectedObject != null;
     }
 
     public void HideAllObjects()

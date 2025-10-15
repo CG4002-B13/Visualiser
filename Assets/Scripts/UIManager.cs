@@ -18,6 +18,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private RectTransform gridOutline;
     [SerializeField] private float outlineAnimationSpeed = 10f;
 
+    [Header("Delete Button")] // NEW SECTION
+    [SerializeField] private GameObject deleteButton;
+
     // Hardcoded position values for each object button
     private Dictionary<string, float> buttonPositions = new Dictionary<string, float>()
     {
@@ -47,6 +50,23 @@ public class UIManager : MonoBehaviour
         InitializeUI();
     }
 
+    private void Start()
+    {
+        // NEW: Setup delete button listener
+        if (deleteButton != null)
+        {
+            Button deleteBtn = deleteButton.GetComponent<Button>();
+            if (deleteBtn != null)
+            {
+                deleteBtn.onClick.AddListener(OnDeleteButtonClicked);
+            }
+            else
+            {
+                Debug.LogError("UIManager: DeleteButton does not have Button component!");
+            }
+        }
+    }
+
     private void InitializeUI()
     {
         UpdateConnectionStatus("Unconnected");
@@ -59,6 +79,12 @@ public class UIManager : MonoBehaviour
         {
             gridOutline.gameObject.SetActive(false);
             isOutlineActive = false;
+        }
+
+        // NEW: Hide delete button on start
+        if (deleteButton != null)
+        {
+            deleteButton.SetActive(false);
         }
     }
 
@@ -152,6 +178,37 @@ public class UIManager : MonoBehaviour
         {
             gridOutline.gameObject.SetActive(false);
             isOutlineActive = false;
+        }
+    }
+
+    // NEW: Show delete button
+    public void ShowDeleteButton()
+    {
+        if (deleteButton != null)
+        {
+            deleteButton.SetActive(true);
+        }
+    }
+
+    // NEW: Hide delete button
+    public void HideDeleteButton()
+    {
+        if (deleteButton != null)
+        {
+            deleteButton.SetActive(false);
+        }
+    }
+
+    // NEW: Delete button click handler
+    private void OnDeleteButtonClicked()
+    {
+        if (ObjectManager.Instance != null)
+        {
+            ObjectManager.Instance.DeleteSelectedObject();
+        }
+        else
+        {
+            Debug.LogError("UIManager: ObjectManager.Instance is null!");
         }
     }
 }
