@@ -28,6 +28,9 @@ public class ControllableObject : MonoBehaviour
 
     private Vector3 lastPosition;
 
+    // ===== NEW: Virtual joystick state component =====
+    private VirtualJoystickState virtualState;
+
     private void Awake()
     {
         _rigidbody = GetComponent<Rigidbody>();
@@ -37,6 +40,13 @@ public class ControllableObject : MonoBehaviour
             originalMaterial = objectRenderer.material;
             highlightMaterial = new Material(originalMaterial);
             highlightMaterial.color = Color.yellow;
+        }
+
+        // Get or add virtualJoystickState component
+        virtualState = GetComponent<VirtualJoystickState>();
+        if (virtualState == null)
+        {
+            virtualState = gameObject.AddComponent<VirtualJoystickState>();
         }
     }
 
@@ -93,7 +103,29 @@ public class ControllableObject : MonoBehaviour
         {
             objectRenderer.material = originalMaterial;
         }
+
+        // Reset virtual state when deselecting
+        if (virtualState != null)
+        {
+            virtualState.ResetState();
+        }
+
         Debug.Log($"{gameObject.name} deselected - now kinematic");
+    }
+
+    // Enable/disable remote control mode
+    public void SetRemoteControlled(bool enabled)
+    {
+        if (virtualState != null)
+        {
+            virtualState.SetRemoteControlled(enabled);
+        }
+    }
+
+    // Get reference to virtual state (for ObjectManager to update sensor data)
+    public VirtualJoystickState GetVirtualState()
+    {
+        return virtualState;
     }
 
     private void Update()
@@ -116,13 +148,33 @@ public class ControllableObject : MonoBehaviour
 
     private void HandleTranslation()
     {
-        float xMove = _axialJoystick != null ? _axialJoystick.Horizontal * _moveSpeed : 0f;
-        float yMove = _axialJoystick != null ? _axialJoystick.Vertical * _moveSpeed : 0f;
+        float xMove, yMove, zMove;
 
-        float zMove = 0f;
-        if (_isMovingForward) zMove += _depthMoveSpeed;
-        if (_isMovingBackward) zMove -= _depthMoveSpeed;
+        // NEW: Check if using virtual (remote) or real (local) input
+        if (virtualState != null && virtualState.IsRemoteControlled)
+        {
+            // REMOTE CONTROL: Read from virtual joystick state
+            xMove = virtualState.GetAxialHorizontal() * _moveSpeed;
+            yMove = virtualState.GetAxialVertical() * _moveSpeed;
 
+            // Virtual Z-buttons (from accelerometer Z-axis)
+            float zMoveForward = virtualState.GetZForward() ? _depthMoveSpeed : 0f;
+            float zMoveBackward = virtualState.GetZBackward() ? _depthMoveSpeed : 0f;
+            zMove = zMoveForward - zMoveBackward;
+        }
+        else
+        {
+            // LOCAL CONTROL: Read from UI joystick (existing code)
+            xMove = _axialJoystick != null ? _axialJoystick.Horizontal * _moveSpeed : 0f;
+            yMove = _axialJoystick != null ? _axialJoystick.Vertical * _moveSpeed : 0f;
+
+            // Local Z-buttons (from UI button press states)
+            float zMoveForward = _isMovingForward ? _depthMoveSpeed : 0f;
+            float zMoveBackward = _isMovingBackward ? _depthMoveSpeed : 0f;
+            zMove = zMoveForward - zMoveBackward;
+        }
+
+        // UNCHANGED: Same movement application for both modes
         Vector3 move = new Vector3(xMove, yMove, zMove);
         Vector3 displacement = move * Time.deltaTime;
 
@@ -131,13 +183,33 @@ public class ControllableObject : MonoBehaviour
 
     private void HandleRotation()
     {
-        float pitch = _rotaryJoystick != null ? -_rotaryJoystick.Vertical * _rotationSpeed * Time.deltaTime : 0f;
-        float roll = _rotaryJoystick != null ? -_rotaryJoystick.Horizontal * _rotationSpeed * Time.deltaTime : 0f;
+        float pitch, roll, yaw;
 
-        float yaw = 0f;
-        if (_isYawingLeft) yaw += _rotationSpeed * Time.deltaTime;
-        if (_isYawingRight) yaw -= _rotationSpeed * Time.deltaTime;
+        // NEW: Check if using virtual (remote) or real (local) input
+        if (virtualState != null && virtualState.IsRemoteControlled)
+        {
+            // REMOTE CONTROL: Read from virtual joystick state
+            pitch = -virtualState.GetRotaryVertical() * _rotationSpeed * Time.deltaTime;
+            roll = -virtualState.GetRotaryHorizontal() * _rotationSpeed * Time.deltaTime;
 
+            // Virtual yaw buttons (from gyroscope Y-axis)
+            float yawLeft = virtualState.GetYawLeft() ? _rotationSpeed * Time.deltaTime : 0f;
+            float yawRight = virtualState.GetYawRight() ? _rotationSpeed * Time.deltaTime : 0f;
+            yaw = yawLeft - yawRight;
+        }
+        else
+        {
+            // LOCAL CONTROL: Read from UI joystick (existing code)
+            pitch = _rotaryJoystick != null ? -_rotaryJoystick.Vertical * _rotationSpeed * Time.deltaTime : 0f;
+            roll = _rotaryJoystick != null ? -_rotaryJoystick.Horizontal * _rotationSpeed * Time.deltaTime : 0f;
+
+            // Local yaw buttons (from UI button press states)
+            float yawLeft = _isYawingLeft ? _rotationSpeed * Time.deltaTime : 0f;
+            float yawRight = _isYawingRight ? _rotationSpeed * Time.deltaTime : 0f;
+            yaw = yawLeft - yawRight;
+        }
+
+        // UNCHANGED: Same rotation application for both modes
         Vector3 eulerRotation = new Vector3(pitch, yaw, roll);
         Quaternion deltaRotation = Quaternion.Euler(eulerRotation);
 
