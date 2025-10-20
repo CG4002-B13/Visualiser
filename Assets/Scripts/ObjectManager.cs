@@ -16,12 +16,21 @@ public class ObjectManager : MonoBehaviour
     [SerializeField] private Button yawRightButton;
 
     [Header("Settings")]
-    [SerializeField] private float moveSpeed = 3f;
-    [SerializeField] private float depthMoveSpeed = 2f;
-    [SerializeField] private float rotationSpeed = 120f;
+    [SerializeField] private float moveSpeed = 2.0f;  // CHANGED: Reduced from 3.0
+    [SerializeField] private float depthMoveSpeed = 1.5f;  // CHANGED: Reduced from 2.0
+    [SerializeField] private float rotationSpeed = 90f;  // CHANGED: Reduced from 120
 
     [Header("Spawn Settings")]
     [SerializeField] private float spawnDistance = 5f;
+
+    [Header("Remote Control Prefab Mappings")]
+    [SerializeField] private GameObject tablePrefab;
+    [SerializeField] private GameObject chairPrefab;
+    [SerializeField] private GameObject lampPrefab;
+    [SerializeField] private GameObject tvConsolePrefab;
+    [SerializeField] private GameObject bedPrefab;
+    [SerializeField] private GameObject plantPrefab;
+    [SerializeField] private GameObject sofaPrefab;
 
     private Dictionary<string, GameObject> instantiatedObjects = new Dictionary<string, GameObject>();
     private ControllableObject currentlySelectedObject;
@@ -67,13 +76,11 @@ public class ObjectManager : MonoBehaviour
 
         if (instantiatedObjects.ContainsKey(objectName))
         {
-            // Object already exists, select it
             SelectObject(instantiatedObjects[objectName]);
             Debug.Log($"Selected existing object: {objectName}");
         }
         else
         {
-            // Instantiate new object
             InstantiateObject(objectName, prefab);
         }
     }
@@ -105,7 +112,6 @@ public class ObjectManager : MonoBehaviour
             controllable = newObject.AddComponent<ControllableObject>();
         }
 
-        // Pass both joysticks and all four buttons
         controllable.Initialize(
             axialJoystick, rotaryJoystick,
             zIncreaseButton, zDecreaseButton,
@@ -115,6 +121,11 @@ public class ObjectManager : MonoBehaviour
 
         instantiatedObjects.Add(objectName, newObject);
         SelectObject(newObject);
+
+        if (SettingsMenuController.Instance != null)
+        {
+            SettingsMenuController.Instance.ApplySettingsToObject(controllable);
+        }
 
         Debug.Log($"Instantiated new object: {objectName} at position {spawnPosition}");
     }
@@ -142,7 +153,7 @@ public class ObjectManager : MonoBehaviour
                 UIManager.Instance.UpdateCurrentObject(obj.name);
                 UIManager.Instance.UpdateObjectCoordinates(obj.transform.position);
                 UIManager.Instance.ShowGridOutline(obj.name);
-                UIManager.Instance.ShowDeleteButton(); // NEW: Show delete button when object is selected
+                UIManager.Instance.ShowDeleteButton();
             }
 
             Debug.Log($"Selected: {obj.name}");
@@ -163,23 +174,12 @@ public class ObjectManager : MonoBehaviour
             if (UIManager.Instance != null)
             {
                 UIManager.Instance.ClearObjectInfo();
-                UIManager.Instance.HideDeleteButton(); // NEW: Hide delete button when nothing is selected
+                UIManager.Instance.HideDeleteButton();
             }
             Debug.Log("Deselected all objects");
         }
     }
 
-    public ControllableObject GetCurrentlySelectedObject()
-    {
-        return currentlySelectedObject;
-    }
-
-    public Dictionary<string, GameObject> GetInstantiatedObjects()
-    {
-        return instantiatedObjects;
-    }
-
-    // NEW: Updated delete method with better safety checks
     public void DeleteSelectedObject()
     {
         if (currentlySelectedObject == null)
@@ -191,32 +191,22 @@ public class ObjectManager : MonoBehaviour
         string objectName = currentlySelectedObject.gameObject.name;
         GameObject objectToDelete = currentlySelectedObject.gameObject;
 
-        // Remove from dictionary first
         if (instantiatedObjects.ContainsKey(objectName))
         {
             instantiatedObjects.Remove(objectName);
         }
 
-        // Clear selection reference
         currentlySelectedObject = null;
 
-        // Update UI
         if (UIManager.Instance != null)
         {
             UIManager.Instance.ClearObjectInfo();
             UIManager.Instance.HideDeleteButton();
         }
 
-        // Destroy the GameObject
         Destroy(objectToDelete);
 
         Debug.Log($"Deleted object: {objectName}");
-    }
-
-    // NEW: Check if there's a selected object
-    public bool HasSelectedObject()
-    {
-        return currentlySelectedObject != null;
     }
 
     public void HideAllObjects()
@@ -249,5 +239,167 @@ public class ObjectManager : MonoBehaviour
             }
         }
         Debug.Log("All objects shown");
+    }
+
+    public ControllableObject GetCurrentlySelectedObject()
+    {
+        return currentlySelectedObject;
+    }
+
+    public Dictionary<string, GameObject> GetInstantiatedObjects()
+    {
+        return instantiatedObjects;
+    }
+
+    public bool HasSelectedObject()
+    {
+        return currentlySelectedObject != null;
+    }
+
+    // ===== REMOTE COMMAND HANDLERS =====
+
+    public void HandleRemoteSelectCommand(string objectName)
+    {
+        string normalizedName = NormalizeObjectName(objectName);
+
+        DebugViewController.AddDebugMessage($"Remote SELECT: {normalizedName}");
+
+        if (instantiatedObjects.ContainsKey(normalizedName))
+        {
+            SelectObject(instantiatedObjects[normalizedName]);
+
+            if (currentlySelectedObject != null)
+            {
+                currentlySelectedObject.SetRemoteControlled(true);
+            }
+
+            DebugViewController.AddDebugMessage($"Selected existing object: {normalizedName}");
+        }
+        else
+        {
+            GameObject prefab = GetPrefabForObjectName(normalizedName);
+            if (prefab != null)
+            {
+                InstantiateObject(normalizedName, prefab);
+
+                if (currentlySelectedObject != null)
+                {
+                    currentlySelectedObject.SetRemoteControlled(true);
+                }
+
+                DebugViewController.AddDebugMessage($"Instantiated new object: {normalizedName}");
+            }
+            else
+            {
+                Debug.LogWarning($"ObjectManager: No prefab mapped for object '{normalizedName}'");
+                DebugViewController.AddDebugMessage($"ERROR: No prefab for '{normalizedName}'");
+            }
+        }
+    }
+
+    public void HandleRemoteDeleteCommand(string objectName)
+    {
+        string normalizedName = NormalizeObjectName(objectName);
+
+        DebugViewController.AddDebugMessage($"Remote DELETE: {normalizedName}");
+
+        if (instantiatedObjects.ContainsKey(normalizedName))
+        {
+            GameObject objToDelete = instantiatedObjects[normalizedName];
+
+            if (currentlySelectedObject != null && currentlySelectedObject.gameObject == objToDelete)
+            {
+                currentlySelectedObject = null;
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.ClearObjectInfo();
+                    UIManager.Instance.HideDeleteButton();
+                }
+            }
+
+            instantiatedObjects.Remove(normalizedName);
+            Destroy(objToDelete);
+
+            DebugViewController.AddDebugMessage($"Deleted object: {normalizedName}");
+        }
+        else
+        {
+            Debug.LogWarning($"ObjectManager: Cannot delete '{normalizedName}' - object not found");
+            DebugViewController.AddDebugMessage($"ERROR: Object '{normalizedName}' not found");
+        }
+    }
+
+    public void HandleRemoteMoveCommand(Vector3 accelerometerData)
+    {
+        if (currentlySelectedObject == null) return;
+
+        VirtualJoystickState virtualState = currentlySelectedObject.GetVirtualState();
+        if (virtualState != null)
+        {
+            virtualState.SetAccelerometerData(accelerometerData);
+        }
+    }
+
+    public void HandleRemoteRotateCommand(Vector3 gyroscopeData)
+    {
+        if (currentlySelectedObject == null) return;
+
+        VirtualJoystickState virtualState = currentlySelectedObject.GetVirtualState();
+        if (virtualState != null)
+        {
+            virtualState.SetGyroscopeData(gyroscopeData);
+        }
+    }
+
+    // NEW: Method to set data flow mode on currently selected object
+    public void SetDataFlowMode(VirtualJoystickState.DataFlowMode mode)
+    {
+        if (currentlySelectedObject != null)
+        {
+            VirtualJoystickState virtualState = currentlySelectedObject.GetVirtualState();
+            if (virtualState != null)
+            {
+                virtualState.SetDataFlowMode(mode);
+                DebugViewController.AddDebugMessage($"Data flow mode changed to: {mode}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("ObjectManager: No object selected to change mode");
+        }
+    }
+
+    // ===== HELPER METHODS =====
+
+    private string NormalizeObjectName(string rawName)
+    {
+        if (string.IsNullOrEmpty(rawName)) return rawName;
+
+        string normalized = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(rawName.ToLower());
+
+        return normalized;
+    }
+
+    private GameObject GetPrefabForObjectName(string objectName)
+    {
+        switch (objectName.ToLower())
+        {
+            case "table":
+                return tablePrefab;
+            case "chair":
+                return chairPrefab;
+            case "lamp":
+                return lampPrefab;
+            case "tv console":
+                return tvConsolePrefab;
+            case "bed":
+                return bedPrefab;
+            case "plant":
+                return plantPrefab;
+            case "sofa":
+                return sofaPrefab;
+            default:
+                return null;
+        }
     }
 }
