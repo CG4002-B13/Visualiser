@@ -157,6 +157,11 @@ public class WS_Client : MonoBehaviour
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage($"RECEIVED: {message}");
+            
+            if (CommandHandler.Instance != null)
+                {
+                    CommandHandler.Instance.HandleWebSocketMessage(message);
+                }
             });
         }
     }
@@ -180,7 +185,7 @@ public class WS_Client : MonoBehaviour
         if (instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
-                DebugViewController.AddDebugMessage("✓ WebSocket connected successfully!");
+                DebugViewController.AddDebugMessage("===== WebSocket connected successfully! =====");
                 instance.isConnected = true;
                 DebugViewController.UpdateConnectionButtons(true);
             });
