@@ -16,6 +16,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
     [Header("Screenshot Settings")]
     [SerializeField] private int screenshotScale = 2;
     [SerializeField] private bool hideButtonDuringCapture = true;
+    [SerializeField] private int maxSessionScreenshots = 12; // Maximum screenshots stored in session
 
     [Header("Visual Feedback")]
     [SerializeField] private Image flashPanel;
@@ -24,6 +25,9 @@ public class ScreenshotManagerIOS : MonoBehaviour
     [Header("Audio Feedback")]
     [SerializeField] private AudioClip shutterSoundClip;
     private AudioSource audioSource;
+
+    // Session storage for gallery feature
+    private List<SessionScreenshotData> sessionScreenshots = new List<SessionScreenshotData>();
 
     private bool isCapturing = false;
 
@@ -69,6 +73,14 @@ public class ScreenshotManagerIOS : MonoBehaviour
     {
         if (!isCapturing)
         {
+            // Check if we've reached the session limit
+            if (sessionScreenshots.Count >= maxSessionScreenshots)
+            {
+                DebugViewController.AddDebugMessage($"Screenshot limit reached ({maxSessionScreenshots}). Delete some screenshots first.");
+                Debug.LogWarning($"Cannot take more screenshots. Session limit: {maxSessionScreenshots}");
+                return;
+            }
+
             StartCoroutine(CaptureScreenshotCoroutine());
         }
     }
@@ -107,6 +119,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
                 File.WriteAllBytes(filePath, bytes);
 
                 Debug.Log($"Screenshot saved to: {filePath}");
+                DebugViewController.AddDebugMessage($"Screenshot captured: {filename}");
 
                 // Play shutter sound
                 if (audioSource != null && shutterSoundClip != null)
@@ -117,17 +130,34 @@ public class ScreenshotManagerIOS : MonoBehaviour
                 // Show flash effect
                 StartCoroutine(FlashEffect());
 
+                // NEW: Store in session memory for gallery
+                SessionScreenshotData sessionData = new SessionScreenshotData(
+                    screenshot,
+                    filePath,
+                    DateTime.Now
+                );
+                sessionScreenshots.Add(sessionData);
+
+                // NEW: Notify GalleryViewController
+                if (GalleryViewController.Instance != null)
+                {
+                    GalleryViewController.Instance.OnScreenshotCaptured(sessionData);
+                }
+
+                DebugViewController.AddDebugMessage($"Session screenshots: {sessionScreenshots.Count}/{maxSessionScreenshots}");
+
                 captureSuccess = true;
+
+                // NOTE: We do NOT destroy the texture anymore - it's kept in sessionScreenshots for gallery use
             }
         }
         catch (Exception e)
         {
             Debug.LogError($"Screenshot failed: {e.Message}");
+            DebugViewController.AddDebugMessage($"Screenshot failed: {e.Message}");
             captureSuccess = false;
-        }
-        finally
-        {
-            // Cleanup texture
+
+            // Cleanup on failure
             if (screenshot != null)
             {
                 Destroy(screenshot);
@@ -206,12 +236,74 @@ public class ScreenshotManagerIOS : MonoBehaviour
             {
                 _SaveImageToGallery(filePath);
                 Debug.Log("Screenshot saved to iOS Photos!");
+                DebugViewController.AddDebugMessage("Saved to iOS Photos");
             }
             catch (Exception e)
             {
                 Debug.LogError($"Failed to save to gallery: {e.Message}");
+                DebugViewController.AddDebugMessage($"iOS Photos save failed: {e.Message}");
             }
         }
 #endif
+    }
+
+    /// <summary>
+    /// Get the list of screenshots captured in the current session (for GalleryViewController)
+    /// </summary>
+    public List<SessionScreenshotData> GetSessionScreenshots()
+    {
+        return sessionScreenshots;
+    }
+
+    /// <summary>
+    /// Remove a screenshot from the session list and delete the file from disk
+    /// Called by GalleryViewController when user deletes a screenshot
+    /// </summary>
+    public void RemoveScreenshotFromSession(SessionScreenshotData data)
+    {
+        if (data == null) return;
+
+        // Remove from session list
+        sessionScreenshots.Remove(data);
+
+        // Destroy the texture to free memory
+        if (data.texture != null)
+        {
+            Destroy(data.texture);
+        }
+
+        // Delete the PNG file from disk
+        if (File.Exists(data.filePath))
+        {
+            try
+            {
+                File.Delete(data.filePath);
+                Debug.Log($"Deleted screenshot file: {data.fileName}");
+                DebugViewController.AddDebugMessage($"Deleted: {data.fileName}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Failed to delete file: {e.Message}");
+                DebugViewController.AddDebugMessage($"Delete failed: {e.Message}");
+            }
+        }
+
+        DebugViewController.AddDebugMessage($"Session screenshots: {sessionScreenshots.Count}/{maxSessionScreenshots}");
+    }
+
+    /// <summary>
+    /// Get the current count of session screenshots
+    /// </summary>
+    public int GetSessionScreenshotCount()
+    {
+        return sessionScreenshots.Count;
+    }
+
+    /// <summary>
+    /// Get the maximum allowed session screenshots
+    /// </summary>
+    public int GetMaxSessionScreenshots()
+    {
+        return maxSessionScreenshots;
     }
 }
