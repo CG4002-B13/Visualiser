@@ -6,9 +6,11 @@ using TMPro;
 
 public class DebugViewController : MonoBehaviour
 {
+    public static DebugViewController Instance { get; private set; }
+
     [Header("Debug Viewer Components")]
-    [SerializeField] private Transform debugContentTransform; // Content GameObject inside ScrollView
-    [SerializeField] private GameObject debugOutputPrefab; // Prefab for each log line (TextMeshPro)
+    [SerializeField] private Transform debugContentTransform;
+    [SerializeField] private GameObject debugOutputPrefab;
 
     [Header("Debug Control Buttons")]
     [SerializeField] private Button connectButton;
@@ -17,22 +19,30 @@ public class DebugViewController : MonoBehaviour
     [SerializeField] private Button clearLogsButton;
 
     [Header("Optional: WS_Client Reference")]
-    [SerializeField] private WS_Client wsClient; // Optional if you have websocket functionality
+    [SerializeField] private WS_Client wsClient;
 
     [Header("Debug Settings")]
     [SerializeField] private int maxLogLines = 100;
 
     private Queue<GameObject> logGameObjects = new Queue<GameObject>();
-    private static DebugViewController instance;
+    private bool lastKnownConnectionState = false;
 
     private void Awake()
     {
-        instance = this;
+        if (Instance == null)
+        {
+            Instance = this;
+            AddDebugMessage("DebugViewController Instance created");
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
     }
 
     private void Start()
     {
-        // Setup debug button listeners
         if (connectButton != null)
         {
             connectButton.onClick.AddListener(OnConnectClicked);
@@ -50,22 +60,74 @@ public class DebugViewController : MonoBehaviour
             clearLogsButton.onClick.AddListener(ClearDebugLog);
         }
 
-        // Initialize connection buttons state
         UpdateConnectionButtons(false);
-
-        // Log initial platform information
         LogPlatformInfo();
+    }
+
+    private void OnEnable()
+    {
+        AddDebugMessage("=== DebugViewController OnEnable() FIRED ===");
+        StartCoroutine(CoSyncUIWithConnectionState());
+    }
+
+    private IEnumerator CoSyncUIWithConnectionState()
+    {
+        yield return null; // Wait a frame so Unity UI is fully set up
+
+        if (WS_Client.Instance != null)
+        {
+            bool connectionState = WS_Client.Instance.IsConnected;
+            AddDebugMessage($"CoSyncUI: WS_Client.Instance.IsConnected = {connectionState}");
+            UpdateConnectionButtons(connectionState);
+            lastKnownConnectionState = connectionState;
+            AddDebugMessage($"CoSyncUI: UpdateConnectionButtons called with {connectionState}");
+        }
+        else
+        {
+            AddDebugMessage("CoSyncUI: ERROR - WS_Client.Instance is NULL!");
+        }
+    }
+
+    private void Update()
+    {
+        if (WS_Client.Instance != null)
+        {
+            bool currentState = WS_Client.Instance.IsConnected;
+            if (currentState != lastKnownConnectionState)
+            {
+                AddDebugMessage($"Update: State change detected {lastKnownConnectionState} → {currentState}");
+                lastKnownConnectionState = currentState;
+                UpdateConnectionButtons(currentState);
+            }
+        }
     }
 
     private void OnDestroy()
     {
-        instance = null;
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 
     public void OnTabOpened()
     {
-        // Called when this tab is opened
+        AddDebugMessage("=== OnTabOpened FIRED ===");
         AddDebugMessage("Debug Viewer Opened");
+
+        if (WS_Client.Instance != null)
+        {
+            bool state = WS_Client.Instance.IsConnected;
+            AddDebugMessage($"OnTabOpened: Connection state = {state}");
+            UpdateConnectionButtons(state);
+            lastKnownConnectionState = state;
+
+            Canvas.ForceUpdateCanvases();
+        }
+        else
+        {
+            AddDebugMessage("OnTabOpened: ERROR - WS_Client.Instance is NULL!");
+        }
     }
 
     private void LogPlatformInfo()
@@ -88,6 +150,26 @@ public class DebugViewController : MonoBehaviour
 
     // ===== DEBUG CONTROL FUNCTIONS =====
 
+    public void ToggleConnection()
+    {
+        if (WS_Client.Instance == null)
+        {
+            AddDebugMessage("ERROR: WS_Client.Instance is null!");
+            return;
+        }
+
+        if (WS_Client.Instance.IsConnected)
+        {
+            AddDebugMessage("ToggleConnection: Calling OnDisconnectClicked");
+            OnDisconnectClicked();
+        }
+        else
+        {
+            AddDebugMessage("ToggleConnection: Calling OnConnectClicked");
+            OnConnectClicked();
+        }
+    }
+
     public void OnConnectClicked()
     {
         AddDebugMessage("=== Connection Attempt Started ===");
@@ -104,7 +186,6 @@ public class DebugViewController : MonoBehaviour
             connectButton.interactable = false;
         }
 
-        // Let WS_Client handle platform-specific logic and messaging
         wsClient.ConnectWebSocket();
     }
 
@@ -134,27 +215,54 @@ public class DebugViewController : MonoBehaviour
 
     public static void UpdateConnectionButtons(bool isConnected)
     {
-        if (instance == null) return;
+        if (Instance == null) return;
 
-        if (instance.connectButton != null)
+        AddDebugMessage($"UpdateConnectionButtons called: isConnected={isConnected}");
+
+        if (Instance.connectButton != null)
         {
-            instance.connectButton.interactable = !isConnected;
+            Instance.connectButton.gameObject.SetActive(false);
+            Instance.connectButton.interactable = !isConnected;
+            Instance.connectButton.gameObject.SetActive(true);
+            AddDebugMessage($"  Connect button interactable = {!isConnected}");
         }
-        if (instance.disconnectButton != null)
+        else
         {
-            instance.disconnectButton.interactable = isConnected;
+            AddDebugMessage("  ERROR: connectButton is NULL!");
         }
-        if (instance.sendPingButton != null)
+
+        if (Instance.disconnectButton != null)
         {
-            instance.sendPingButton.interactable = isConnected;
+            Instance.disconnectButton.gameObject.SetActive(false);
+            Instance.disconnectButton.interactable = isConnected;
+            Instance.disconnectButton.gameObject.SetActive(true);
+            AddDebugMessage($"  Disconnect button interactable = {isConnected}");
         }
+        else
+        {
+            AddDebugMessage("  ERROR: disconnectButton is NULL!");
+        }
+
+        if (Instance.sendPingButton != null)
+        {
+            Instance.sendPingButton.gameObject.SetActive(false);
+            Instance.sendPingButton.interactable = isConnected;
+            Instance.sendPingButton.gameObject.SetActive(true);
+            AddDebugMessage($"  SendPing button interactable = {isConnected}");
+        }
+        else
+        {
+            AddDebugMessage("  ERROR: sendPingButton is NULL!");
+        }
+
+        Canvas.ForceUpdateCanvases();
+        AddDebugMessage("  Forced Canvas update + GameObject toggle");
     }
 
     public static void AddDebugMessage(string message)
     {
-        if (instance == null)
+        if (Instance == null)
         {
-            // Fallback to Unity console if instance doesn't exist yet
             Debug.Log($"[DebugView] {message}");
             return;
         }
@@ -162,26 +270,21 @@ public class DebugViewController : MonoBehaviour
         string timestamp = System.DateTime.Now.ToString("HH:mm:ss.fff");
         string formattedMsg = $"[{timestamp}] {message}";
 
-        // Validate required references
-        if (instance.debugContentTransform == null)
+        if (Instance.debugContentTransform == null)
         {
             Debug.LogError("DebugViewController: debugContentTransform is not assigned!");
             return;
         }
 
-        if (instance.debugOutputPrefab == null)
+        if (Instance.debugOutputPrefab == null)
         {
             Debug.LogError("DebugViewController: debugOutputPrefab is not assigned!");
             return;
         }
 
-        // Create new DebugOutput GameObject
-        GameObject newLogEntry = Instantiate(instance.debugOutputPrefab, instance.debugContentTransform);
-
-        // Set it as last sibling to appear at bottom
+        GameObject newLogEntry = Instantiate(Instance.debugOutputPrefab, Instance.debugContentTransform);
         newLogEntry.transform.SetAsLastSibling();
 
-        // Get the TextMeshProUGUI component and set text
         TextMeshProUGUI textComponent = newLogEntry.GetComponent<TextMeshProUGUI>();
         if (textComponent != null)
         {
@@ -192,26 +295,20 @@ public class DebugViewController : MonoBehaviour
             Debug.LogError("DebugViewController: DebugOutputPrefab does not have TextMeshProUGUI component!");
         }
 
-        // Add to queue
-        instance.logGameObjects.Enqueue(newLogEntry);
+        Instance.logGameObjects.Enqueue(newLogEntry);
 
-        // Remove oldest if exceeding limit
-        if (instance.logGameObjects.Count > instance.maxLogLines)
+        if (Instance.logGameObjects.Count > Instance.maxLogLines)
         {
-            GameObject oldestLog = instance.logGameObjects.Dequeue();
+            GameObject oldestLog = Instance.logGameObjects.Dequeue();
             Destroy(oldestLog);
         }
 
-        // Force canvas update for ScrollView
         Canvas.ForceUpdateCanvases();
-
-        // Log to Unity console for debugging
         Debug.Log(formattedMsg);
     }
 
     public void ClearDebugLog()
     {
-        // Destroy all existing log GameObjects
         while (logGameObjects.Count > 0)
         {
             GameObject logEntry = logGameObjects.Dequeue();
@@ -221,7 +318,6 @@ public class DebugViewController : MonoBehaviour
             }
         }
 
-        // Add confirmation message after clearing
         AddDebugMessage("--- Logs Cleared ---");
     }
 }
