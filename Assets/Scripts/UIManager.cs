@@ -14,11 +14,14 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI currentObjectValue;
     [SerializeField] private TextMeshProUGUI objectCoordinatesValue;
 
+    [Header("Connection Status UI")]
+    [SerializeField] private GameObject connectedImage; // The indicator icon
+
     [Header("Selection Outline")]
     [SerializeField] private RectTransform gridOutline;
     [SerializeField] private float outlineAnimationSpeed = 10f;
 
-    [Header("Delete Button")] // NEW SECTION
+    [Header("Delete Button")]
     [SerializeField] private GameObject deleteButton;
 
     // Hardcoded position values for each object button
@@ -35,6 +38,7 @@ public class UIManager : MonoBehaviour
 
     private float targetPosX;
     private bool isOutlineActive = false;
+    private bool lastConnectionState = false; // Track connection state
 
     private void Awake()
     {
@@ -52,7 +56,7 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
-        // NEW: Setup delete button listener
+        // Setup delete button listener
         if (deleteButton != null)
         {
             Button deleteBtn = deleteButton.GetComponent<Button>();
@@ -69,7 +73,7 @@ public class UIManager : MonoBehaviour
 
     private void InitializeUI()
     {
-        UpdateConnectionStatus("Unconnected");
+        UpdateConnectionStatusUI(false); // Initialize connection status
         UpdateCurrentStage("Object Placement");
         UpdateCurrentObject("");
         ClearCoordinates();
@@ -81,7 +85,7 @@ public class UIManager : MonoBehaviour
             isOutlineActive = false;
         }
 
-        // NEW: Hide delete button on start
+        // Hide delete button on start
         if (deleteButton != null)
         {
             deleteButton.SetActive(false);
@@ -97,13 +101,37 @@ public class UIManager : MonoBehaviour
             float newPosX = Mathf.Lerp(currentPos.x, targetPosX, Time.deltaTime * outlineAnimationSpeed);
             gridOutline.anchoredPosition = new Vector3(newPosX, currentPos.y, currentPos.z);
         }
+
+        // Poll connection state and update UI
+        if (WS_Client.Instance != null)
+        {
+            bool currentState = WS_Client.Instance.IsConnected;
+            if (currentState != lastConnectionState)
+            {
+                lastConnectionState = currentState;
+                UpdateConnectionStatusUI(currentState);
+            }
+        }
     }
 
-    public void UpdateConnectionStatus(string status)
+    // public void UpdateConnectionStatus(string status)
+    // {
+    //     if (connectionStatusValue != null)
+    //     {
+    //         connectionStatusValue.text = status;
+    //     }
+    // }
+
+    private void UpdateConnectionStatusUI(bool isConnected)
     {
         if (connectionStatusValue != null)
         {
-            connectionStatusValue.text = status;
+            connectionStatusValue.text = isConnected ? "Connected" : "Unconnected";
+        }
+
+        if (connectedImage != null)
+        {
+            connectedImage.SetActive(isConnected);
         }
     }
 
