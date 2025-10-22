@@ -5,6 +5,8 @@ using AOT;
 
 public class WS_Client : MonoBehaviour
 {
+    public static WS_Client Instance { get; private set; } // NEW: Singleton
+
 #if UNITY_IOS && !UNITY_EDITOR
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void MessageCallback(string message);
@@ -44,11 +46,22 @@ public class WS_Client : MonoBehaviour
 
     private IntPtr wsInstance;
     private bool isConnected = false;
-    private static WS_Client instance;
+
+    // NEW: Public getter for connection state
+    public bool IsConnected => isConnected;
 
     private void Awake()
     {
-        instance = this;
+        // NEW: Singleton setup
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
     }
 
     private void Start()
@@ -153,12 +166,12 @@ public class WS_Client : MonoBehaviour
     [MonoPInvokeCallback(typeof(MessageCallback))]
     private static void OnMessageReceived(string message)
     {
-        if (instance != null)
+        if (Instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage($"RECEIVED: {message}");
             
-            if (CommandHandler.Instance != null)
+                if (CommandHandler.Instance != null)
                 {
                     CommandHandler.Instance.HandleWebSocketMessage(message);
                 }
@@ -169,11 +182,11 @@ public class WS_Client : MonoBehaviour
     [MonoPInvokeCallback(typeof(ErrorCallback))]
     private static void OnError(string error)
     {
-        if (instance != null)
+        if (Instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage($"ERROR: {error}");
-                instance.isConnected = false;
+                Instance.isConnected = false;
                 DebugViewController.UpdateConnectionButtons(false);
             });
         }
@@ -182,11 +195,11 @@ public class WS_Client : MonoBehaviour
     [MonoPInvokeCallback(typeof(ConnectCallback))]
     private static void OnConnected()
     {
-        if (instance != null)
+        if (Instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage("===== WebSocket connected successfully! =====");
-                instance.isConnected = true;
+                Instance.isConnected = true;
                 DebugViewController.UpdateConnectionButtons(true);
             });
         }
@@ -201,6 +214,11 @@ public class WS_Client : MonoBehaviour
             _CloseWebSocket(wsInstance);
         }
 #endif
-        instance = null;
+
+        // NEW: Clear singleton reference
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
 }
