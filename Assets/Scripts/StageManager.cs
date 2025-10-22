@@ -26,7 +26,6 @@ public class StageManager : MonoBehaviour
     [SerializeField] private GameObject yawRightButton;
     [SerializeField] private GameObject zIncreaseButton;
     [SerializeField] private GameObject zDecreaseButton;
-    // REMOVED: gridOutline reference - UIManager handles this
     [SerializeField] private GameObject deleteButton;
 
     [Header("Object Detection UI")]
@@ -36,6 +35,8 @@ public class StageManager : MonoBehaviour
     [SerializeField] private GameObject topPane;
     [SerializeField] private GameObject objectDetectionButton;
     [SerializeField] private GameObject screenshotButton;
+    [SerializeField] private GameObject connectionButton;
+    [SerializeField] private GameObject xrModeToggleButton;
     [SerializeField] private GameObject settingsGearButton;
 
     [Header("Settings Panel")]
@@ -81,8 +82,30 @@ public class StageManager : MonoBehaviour
             }
         }
 
+        // Setup button listener for Connection Button
+        if (connectionButton != null)
+        {
+            Button connButton = connectionButton.GetComponent<Button>();
+            if (connButton != null)
+            {
+                connButton.onClick.AddListener(OnConnectionButtonClicked);
+            }
+        }
+
         // Start in Object Placement stage
         SetStage(Stage.ObjectPlacement);
+    }
+
+    private void OnConnectionButtonClicked()
+    {
+        if (DebugViewController.Instance == null)
+        {
+            Debug.LogError("StageManager: DebugViewController.Instance is null!");
+            return;
+        }
+
+        // Delegate to DebugViewController's connection management
+        DebugViewController.Instance.ToggleConnection();
     }
 
     public void ToggleStage()
@@ -142,9 +165,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(zIncreaseButton, true);
         SetUIActive(zDecreaseButton, true);
 
-        // GridOutline and DeleteButton visibility are managed by UIManager based on selection
-        // Don't touch them here
-
         // Disable Object Detection UI
         SetUIActive(boundingBoxOverlay, false);
 
@@ -152,6 +172,8 @@ public class StageManager : MonoBehaviour
         SetUIActive(topPane, true);
         SetUIActive(objectDetectionButton, true);
         SetUIActive(screenshotButton, true);
+        SetUIActive(connectionButton, true);
+        SetUIActive(xrModeToggleButton, true);
         SetUIActive(settingsGearButton, true);
 
         // Disable Settings Panel
@@ -188,10 +210,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(yawRightButton, false);
         SetUIActive(zIncreaseButton, false);
         SetUIActive(zDecreaseButton, false);
-
-        // FIXED: Don't force-hide gridOutline - let UIManager handle it
-        // REMOVED: SetUIActive(gridOutline, false);
-
         SetUIActive(deleteButton, false);
 
         // Enable Object Detection UI
@@ -201,6 +219,8 @@ public class StageManager : MonoBehaviour
         SetUIActive(topPane, true);
         SetUIActive(objectDetectionButton, true);
         SetUIActive(screenshotButton, true);
+        SetUIActive(connectionButton, true);
+        SetUIActive(xrModeToggleButton, true);
         SetUIActive(settingsGearButton, true);
 
         // Disable Settings Panel
@@ -216,14 +236,14 @@ public class StageManager : MonoBehaviour
         if (objectManager != null)
         {
             objectManager.HideAllObjects();
-            objectManager.DeselectAll(); // This will call UIManager to hide gridOutline
+            objectManager.DeselectAll();
         }
 
         // Update UI Manager
         if (UIManager.Instance != null)
         {
             UIManager.Instance.UpdateCurrentStage("Object Detection");
-            UIManager.Instance.ClearObjectInfo(); // This also hides the grid outline properly
+            UIManager.Instance.ClearObjectInfo();
         }
 
         Debug.Log("Switched to Object Detection Stage");
@@ -239,10 +259,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(yawRightButton, false);
         SetUIActive(zIncreaseButton, false);
         SetUIActive(zDecreaseButton, false);
-
-        // FIXED: Don't force-hide gridOutline - let UIManager handle it
-        // REMOVED: SetUIActive(gridOutline, false);
-
         SetUIActive(deleteButton, false);
 
         // Disable Object Detection UI
@@ -252,6 +268,8 @@ public class StageManager : MonoBehaviour
         SetUIActive(topPane, false);
         SetUIActive(objectDetectionButton, false);
         SetUIActive(screenshotButton, false);
+        SetUIActive(connectionButton, false);
+        SetUIActive(xrModeToggleButton, false);
         SetUIActive(settingsGearButton, false);
 
         // Enable Settings Panel
@@ -266,7 +284,7 @@ public class StageManager : MonoBehaviour
         // Deselect any selected objects before entering settings
         if (objectManager != null)
         {
-            objectManager.DeselectAll(); // This will hide gridOutline via UIManager
+            objectManager.DeselectAll();
         }
 
         // Initialize settings panel to show default tab
