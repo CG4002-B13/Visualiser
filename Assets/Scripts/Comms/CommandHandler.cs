@@ -103,7 +103,7 @@ public class CommandHandler : MonoBehaviour
                 return;
             }
 
-            string objectName = dataObj["object"]?.ToString();
+            string objectName = dataObj["result"]?.ToString();
 
             if (string.IsNullOrEmpty(objectName))
             {
@@ -136,7 +136,7 @@ public class CommandHandler : MonoBehaviour
                 return;
             }
 
-            string objectName = dataObj["object"]?.ToString();
+            string objectName = dataObj["result"]?.ToString();
 
             if (string.IsNullOrEmpty(objectName))
             {
