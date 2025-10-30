@@ -1,11 +1,12 @@
 using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Networking;
 using AOT;
 
 public class WS_Client : MonoBehaviour
 {
-    public static WS_Client Instance { get; private set; } // NEW: Singleton
+    public static WS_Client Instance { get; private set; }
 
 #if UNITY_IOS && !UNITY_EDITOR
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -40,19 +41,21 @@ public class WS_Client : MonoBehaviour
 #endif
 
     [Header("Configuration")]
-    [SerializeField] private string serverUrl = "wss://ec2-13-229-220-104.ap-southeast-1.compute.amazonaws.com:8443/ws?userId=parth&sessionId=1";
+    [SerializeField] private string baseUrl = "wss://ec2-13-229-220-104.ap-southeast-1.compute.amazonaws.com:8443/ws";
     [SerializeField] private string certificateFileName = "devices-client2.p12";
     [SerializeField] private string certificatePassword = "pass";
 
     private IntPtr wsInstance;
     private bool isConnected = false;
 
-    // NEW: Public getter for connection state
+    // Store current connection credentials for debugging
+    private string currentUserId = "";
+    private string currentSessionId = "";
+
     public bool IsConnected => isConnected;
 
     private void Awake()
     {
-        // NEW: Singleton setup
         if (Instance == null)
         {
             Instance = this;
@@ -66,7 +69,6 @@ public class WS_Client : MonoBehaviour
 
     private void Start()
     {
-        // Don't auto-connect - let debug panel control this
         DebugViewController.AddDebugMessage("WS_Client initialized. Ready to connect.");
     }
 
@@ -79,15 +81,55 @@ public class WS_Client : MonoBehaviour
             return;
         }
 
+        // === RETRIEVE USERNAME FROM SETTINGS ===
+        if (SettingsMenuController.Instance == null)
+        {
+            DebugViewController.AddDebugMessage("ERROR: SettingsMenuController.Instance is null");
+            DebugViewController.UpdateConnectionButtons(false);
+            return;
+        }
+
+        string username = SettingsMenuController.Instance.GetUsername();
+        
+        // === VALIDATE USERNAME ===
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            DebugViewController.AddDebugMessage("=== CONNECTION FAILED ===");
+            DebugViewController.AddDebugMessage("ERROR: Username is required");
+            DebugViewController.AddDebugMessage("Please enter a username in Settings before connecting");
+            DebugViewController.UpdateConnectionButtons(false);
+            return;
+        }
+
+        // Trim whitespace
+        username = username.Trim();
+
         try
         {
-            // Direct access - no copying needed on iOS
+            DebugViewController.AddDebugMessage("=== Connection Attempt Started ===");
+            DebugViewController.AddDebugMessage($"Username: {username}");
+            
+            // === GENERATE USERID AND SESSIONID ===
+            long epochTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            currentUserId = $"{username}-{epochTime}";
+            currentSessionId = username;
+            
+            DebugViewController.AddDebugMessage($"Generated userId: {currentUserId}");
+            DebugViewController.AddDebugMessage($"Generated sessionId: {currentSessionId}");
+            
+            // === BUILD DYNAMIC URL ===
+            string encodedUserId = UnityWebRequest.EscapeURL(currentUserId);
+            string encodedSessionId = UnityWebRequest.EscapeURL(currentSessionId);
+            string fullUrl = $"{baseUrl}?userId={encodedUserId}&sessionId={encodedSessionId}";
+            
+            DebugViewController.AddDebugMessage($"Connection URL: {fullUrl}");
+            
+            // === CERTIFICATE SETUP ===
             string certPath = System.IO.Path.Combine(Application.streamingAssetsPath, certificateFileName);
             
             DebugViewController.AddDebugMessage($"Certificate path: {certPath}");
             DebugViewController.AddDebugMessage($"Looking for file: {certificateFileName}");
             
-            // Verify the file exists
             if (!System.IO.File.Exists(certPath))
             {
                 DebugViewController.AddDebugMessage($"ERROR: Certificate file not found at: {certPath}");
@@ -96,7 +138,9 @@ public class WS_Client : MonoBehaviour
             }
             
             DebugViewController.AddDebugMessage($"Certificate found! Creating WebSocket...");
-            wsInstance = _CreateWebSocket(serverUrl, certPath, certificatePassword);
+            
+            // === CREATE WEBSOCKET WITH DYNAMIC URL ===
+            wsInstance = _CreateWebSocket(fullUrl, certPath, certificatePassword);
             
             if (wsInstance != IntPtr.Zero)
             {
@@ -132,7 +176,14 @@ public class WS_Client : MonoBehaviour
             _CloseWebSocket(wsInstance);
             wsInstance = IntPtr.Zero;
             isConnected = false;
+            
             DebugViewController.AddDebugMessage("WebSocket disconnected");
+            DebugViewController.AddDebugMessage($"Disconnected from userId: {currentUserId}");
+            
+            // Clear credentials
+            currentUserId = "";
+            currentSessionId = "";
+            
             DebugViewController.UpdateConnectionButtons(false);
         }
 #else
@@ -199,6 +250,7 @@ public class WS_Client : MonoBehaviour
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage("===== WebSocket connected successfully! =====");
+                DebugViewController.AddDebugMessage($"Connected as: {Instance.currentUserId}");
                 Instance.isConnected = true;
                 DebugViewController.UpdateConnectionButtons(true);
             });
@@ -215,10 +267,13 @@ public class WS_Client : MonoBehaviour
         }
 #endif
 
-        // NEW: Clear singleton reference
         if (Instance == this)
         {
             Instance = null;
         }
     }
+
+    // Public getter for debugging
+    public string GetCurrentUserId() => currentUserId;
+    public string GetCurrentSessionId() => currentSessionId;
 }
