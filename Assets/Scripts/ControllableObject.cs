@@ -192,10 +192,8 @@ public class ControllableObject : MonoBehaviour
             pitch = -virtualState.GetRotaryVertical() * _rotationSpeed * Time.deltaTime;
             roll = -virtualState.GetRotaryHorizontal() * _rotationSpeed * Time.deltaTime;
 
-            // Virtual yaw buttons (from gyroscope Y-axis)
-            float yawLeft = virtualState.GetYawLeft() ? _rotationSpeed * Time.deltaTime : 0f;
-            float yawRight = virtualState.GetYawRight() ? _rotationSpeed * Time.deltaTime : 0f;
-            yaw = yawLeft - yawRight;
+            // CHANGED: Use continuous yaw value instead of buttons
+            yaw = virtualState.GetYaw() * _rotationSpeed * Time.deltaTime;
         }
         else
         {
