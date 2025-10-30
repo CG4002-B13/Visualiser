@@ -184,7 +184,20 @@ public class WS_Client : MonoBehaviour
             currentUserId = "";
             currentSessionId = "";
             
+            // Update UI state
             DebugViewController.UpdateConnectionButtons(false);
+            
+            // Update Show Controls state
+            if (SettingsMenuController.Instance != null)
+            {
+                SettingsMenuController.Instance.UpdateShowControlsState(false);
+            }
+            
+            // Update control visibility
+            if (StageManager.Instance != null)
+            {
+                StageManager.Instance.UpdateControlsVisibility();
+            }
         }
 #else
         DebugViewController.AddDebugMessage("Disconnect only available on iOS device");
@@ -239,6 +252,18 @@ public class WS_Client : MonoBehaviour
                 DebugViewController.AddDebugMessage($"ERROR: {error}");
                 Instance.isConnected = false;
                 DebugViewController.UpdateConnectionButtons(false);
+                
+                // Update Show Controls state
+                if (SettingsMenuController.Instance != null)
+                {
+                    SettingsMenuController.Instance.UpdateShowControlsState(false);
+                }
+                
+                // Update control visibility
+                if (StageManager.Instance != null)
+                {
+                    StageManager.Instance.UpdateControlsVisibility();
+                }
             });
         }
     }
@@ -253,6 +278,18 @@ public class WS_Client : MonoBehaviour
                 DebugViewController.AddDebugMessage($"Connected as: {Instance.currentUserId}");
                 Instance.isConnected = true;
                 DebugViewController.UpdateConnectionButtons(true);
+                
+                // Update Show Controls state
+                if (SettingsMenuController.Instance != null)
+                {
+                    SettingsMenuController.Instance.UpdateShowControlsState(true);
+                }
+                
+                // Update control visibility
+                if (StageManager.Instance != null)
+                {
+                    StageManager.Instance.UpdateControlsVisibility();
+                }
             });
         }
     }
