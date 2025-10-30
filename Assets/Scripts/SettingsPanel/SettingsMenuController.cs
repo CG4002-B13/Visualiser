@@ -9,6 +9,10 @@ public class SettingsMenuController : MonoBehaviour
     [Header("User Connection Settings")]
     [SerializeField] private TMP_InputField usernameInputField;
 
+    [Header("Show Controls Indicator")]
+    [SerializeField] private Button showControlsButton;
+    [SerializeField] private TextMeshProUGUI showControlsButtonText;
+
     [Header("Discrete Packet Debugging")]
     [SerializeField] private Button discretePacketToggleButton;
     [SerializeField] private TextMeshProUGUI discretePacketButtonText;
@@ -20,6 +24,7 @@ public class SettingsMenuController : MonoBehaviour
     // Global state variables
     private bool isDiscreteMode = false;
     private int currentSliderValue = 10;
+    private bool hideControls = false; // true = controls hidden (remote mode), false = controls visible (local mode)
 
     // Saved keys for PlayerPrefs
     private const string PREF_USERNAME = "Settings_Username";
@@ -69,8 +74,15 @@ public class SettingsMenuController : MonoBehaviour
             usernameInputField.onEndEdit.AddListener(OnUsernameChanged);
         }
 
+        // Show Controls button - no onClick listener (read-only indicator)
+        if (showControlsButton == null)
+        {
+            Debug.LogError("SettingsMenuController: showControlsButton is not assigned!");
+        }
+
         UpdateDiscretePacketUI();
         UpdateSensitivityUI();
+        UpdateShowControlsUI();
         LogCurrentConfiguration();
     }
 
@@ -79,7 +91,43 @@ public class SettingsMenuController : MonoBehaviour
         DebugViewController.AddDebugMessage("--- Settings Tab Opened ---");
         UpdateDiscretePacketUI();
         UpdateSensitivityUI();
+        UpdateShowControlsUI();
         LogCurrentConfiguration();
+    }
+
+    // ===== SHOW CONTROLS INDICATOR =====
+
+    public void UpdateShowControlsState(bool isConnected)
+    {
+        hideControls = isConnected; // true = connected = controls hidden
+        UpdateShowControlsUI();
+
+        string statusMsg = hideControls ? "Controls hidden (remote mode)" : "Controls visible (local mode)";
+        DebugViewController.AddDebugMessage($"Show Controls state: {statusMsg}");
+    }
+
+    private void UpdateShowControlsUI()
+    {
+        if (showControlsButtonText != null)
+        {
+            showControlsButtonText.text = hideControls ? "ON" : "OFF";
+        }
+
+        if (showControlsButton != null)
+        {
+            ColorBlock colors = showControlsButton.colors;
+            if (hideControls)
+            {
+                // ON = Controls hidden (remote mode)
+                colors.normalColor = new Color(0.7f, 1.0f, 0.7f); // Light green
+            }
+            else
+            {
+                // OFF = Controls visible (local mode)
+                colors.normalColor = new Color(1.0f, 1.0f, 1.0f); // White
+            }
+            showControlsButton.colors = colors;
+        }
     }
 
     // ===== DISCRETE PACKET DEBUGGING TOGGLE =====
@@ -346,6 +394,7 @@ public class SettingsMenuController : MonoBehaviour
         DebugViewController.AddDebugMessage($"Data Mode: {(isDiscreteMode ? "Discrete Packets" : "Streaming (30Hz)")}");
         float actualMultiplier = currentSliderValue / 10.0f;
         DebugViewController.AddDebugMessage($"Sensitivity: {currentSliderValue} ({actualMultiplier:F1}x) {(isDiscreteMode ? "(ignored in Discrete)" : "(active)")}");
+        DebugViewController.AddDebugMessage($"Hide Controls: {(hideControls ? "ON (hidden)" : "OFF (visible)")}");
 
         string username = usernameInputField != null ? usernameInputField.text : "";
 
