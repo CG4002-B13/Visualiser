@@ -32,14 +32,10 @@ public class CommandHandler : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Main entry point for WebSocket message handling
-    /// </summary>
     public void HandleWebSocketMessage(string jsonMessage)
     {
         try
         {
-            // Parse the JSON message
             JObject messageObj = JObject.Parse(jsonMessage);
 
             string eventType = messageObj["eventType"]?.ToString();
@@ -52,7 +48,6 @@ public class CommandHandler : MonoBehaviour
 
             DebugViewController.AddDebugMessage($"Processing command: {eventType}");
 
-            // Route to appropriate handler
             switch (eventType)
             {
                 case "COMMAND_SELECT":
@@ -75,8 +70,8 @@ public class CommandHandler : MonoBehaviour
                     HandleScreenshotCommand(messageObj);
                     break;
 
-                case "COMMAND_SPEECH":
-                    HandleSpeechCommand(messageObj);
+                case "COMMAND_SET":
+                    HandleSetCommand(messageObj);
                     break;
 
                 default:
@@ -95,7 +90,6 @@ public class CommandHandler : MonoBehaviour
     {
         try
         {
-            // Parse data field
             JObject dataObj = messageObj["data"] as JObject;
             if (dataObj == null)
             {
@@ -107,13 +101,12 @@ public class CommandHandler : MonoBehaviour
 
             if (string.IsNullOrEmpty(objectName))
             {
-                Debug.LogWarning("CommandHandler: COMMAND_SELECT object name is missing");
+                Debug.LogWarning("CommandHandler: COMMAND_SELECT result name is missing");
                 return;
             }
 
             DebugViewController.AddDebugMessage($"Select command: {objectName}");
 
-            // Call ObjectManager to select/instantiate object
             if (objectManager != null)
             {
                 objectManager.HandleRemoteSelectCommand(objectName);
@@ -140,13 +133,12 @@ public class CommandHandler : MonoBehaviour
 
             if (string.IsNullOrEmpty(objectName))
             {
-                Debug.LogWarning("CommandHandler: COMMAND_DELETE object name is missing");
+                Debug.LogWarning("CommandHandler: COMMAND_DELETE result name is missing");
                 return;
             }
 
             DebugViewController.AddDebugMessage($"Delete command: {objectName}");
 
-            // Call ObjectManager to delete object
             if (objectManager != null)
             {
                 objectManager.HandleRemoteDeleteCommand(objectName);
@@ -177,7 +169,6 @@ public class CommandHandler : MonoBehaviour
 
             DebugViewController.AddDebugMessage($"Move command: ({x:F2}, {y:F2}, {z:F2})");
 
-            // Call ObjectManager to move selected object
             if (objectManager != null)
             {
                 objectManager.HandleRemoteMoveCommand(moveVector);
@@ -208,7 +199,6 @@ public class CommandHandler : MonoBehaviour
 
             DebugViewController.AddDebugMessage($"Rotate command: ({x:F2}, {y:F2}, {z:F2})");
 
-            // Call ObjectManager to rotate selected object
             if (objectManager != null)
             {
                 objectManager.HandleRemoteRotateCommand(rotationVector);
@@ -222,13 +212,99 @@ public class CommandHandler : MonoBehaviour
 
     private void HandleScreenshotCommand(JObject messageObj)
     {
-        DebugViewController.AddDebugMessage("Screenshot command received (not yet implemented)");
-        // TODO: Implement screenshot functionality
+        try
+        {
+            DebugViewController.AddDebugMessage("Screenshot command received");
+
+            // TODO: Implement screenshot functionality
+            Debug.Log("CommandHandler: Screenshot functionality not yet implemented");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleScreenshotCommand: {ex.Message}");
+        }
     }
 
-    private void HandleSpeechCommand(JObject messageObj)
+    private void HandleSetCommand(JObject messageObj)
     {
-        DebugViewController.AddDebugMessage("Speech command received (not yet implemented)");
-        // TODO: Implement speech/text-to-speech functionality
+        try
+        {
+            JObject dataObj = messageObj["data"] as JObject;
+            if (dataObj == null)
+            {
+                Debug.LogWarning("CommandHandler: COMMAND_SET has no data field");
+                return;
+            }
+
+            string command = dataObj["command"]?.ToString();
+            string result = dataObj["result"]?.ToString();
+
+            if (string.IsNullOrEmpty(command) || string.IsNullOrEmpty(result))
+            {
+                Debug.LogWarning("CommandHandler: COMMAND_SET missing command or result");
+                return;
+            }
+
+            DebugViewController.AddDebugMessage($"Set command: {command} → {result}");
+
+            // Route based on result value
+            if (result.ToUpper() == "UP")
+            {
+                // Increase sensitivity
+                if (SettingsMenuController.Instance != null)
+                {
+                    SettingsMenuController.Instance.AdjustSensitivity("up");
+                }
+                else
+                {
+                    Debug.LogError("CommandHandler: SettingsMenuController.Instance is null");
+                }
+            }
+            else if (result.ToUpper() == "DOWN")
+            {
+                // Decrease sensitivity
+                if (SettingsMenuController.Instance != null)
+                {
+                    SettingsMenuController.Instance.AdjustSensitivity("down");
+                }
+                else
+                {
+                    Debug.LogError("CommandHandler: SettingsMenuController.Instance is null");
+                }
+            }
+            else if (result.ToUpper() == "ODM")
+            {
+                // Toggle Object Detection Mode
+                DebugViewController.AddDebugMessage("ODM toggle command received");
+
+                if (StageManager.Instance != null)
+                {
+                    StageManager.Stage beforeStage = StageManager.Instance.GetCurrentStage();
+                    StageManager.Instance.ToggleStage();
+                    StageManager.Stage afterStage = StageManager.Instance.GetCurrentStage();
+
+                    DebugViewController.AddDebugMessage($"[COMMAND] ODM: {beforeStage} → {afterStage}");
+                }
+                else
+                {
+                    Debug.LogError("CommandHandler: StageManager.Instance is null");
+                }
+            }
+            else if (result.ToUpper() == "TOGGLE")
+            {
+                // TODO: Handle TOGGLE command (reserved for future use)
+                DebugViewController.AddDebugMessage("TOGGLE command received (not yet implemented)");
+                Debug.Log("CommandHandler: TOGGLE functionality not yet implemented");
+            }
+            else
+            {
+                Debug.LogWarning($"CommandHandler: Unknown SET result '{result}'");
+                DebugViewController.AddDebugMessage($"Unknown SET result: {result}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleSetCommand: {ex.Message}");
+        }
     }
 }
