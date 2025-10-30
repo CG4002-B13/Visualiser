@@ -47,6 +47,14 @@ public class StageManager : MonoBehaviour
     [SerializeField] private ObjectManager objectManager;
     [SerializeField] private SettingsPanelController settingsPanelController;
 
+    // CanvasGroups for control visibility (alpha-based hiding)
+    private CanvasGroup axialJoystickCanvasGroup;
+    private CanvasGroup rotaryJoystickCanvasGroup;
+    private CanvasGroup yawLeftButtonCanvasGroup;
+    private CanvasGroup yawRightButtonCanvasGroup;
+    private CanvasGroup zIncreaseButtonCanvasGroup;
+    private CanvasGroup zDecreaseButtonCanvasGroup;
+
     private void Awake()
     {
         if (Instance == null)
@@ -62,6 +70,9 @@ public class StageManager : MonoBehaviour
 
     private void Start()
     {
+        // Cache CanvasGroup references
+        CacheCanvasGroups();
+
         // Setup button listener for Object Detection toggle
         if (objectDetectionButton != null)
         {
@@ -94,6 +105,70 @@ public class StageManager : MonoBehaviour
 
         // Start in Object Placement stage
         SetStage(Stage.ObjectPlacement);
+    }
+
+    private void CacheCanvasGroups()
+    {
+        // Get or add CanvasGroup components to all control GameObjects
+        if (axialJoystick != null)
+        {
+            axialJoystickCanvasGroup = axialJoystick.GetComponent<CanvasGroup>();
+            if (axialJoystickCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to axialJoystick");
+                axialJoystickCanvasGroup = axialJoystick.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (rotaryJoystick != null)
+        {
+            rotaryJoystickCanvasGroup = rotaryJoystick.GetComponent<CanvasGroup>();
+            if (rotaryJoystickCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to rotaryJoystick");
+                rotaryJoystickCanvasGroup = rotaryJoystick.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (yawLeftButton != null)
+        {
+            yawLeftButtonCanvasGroup = yawLeftButton.GetComponent<CanvasGroup>();
+            if (yawLeftButtonCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to yawLeftButton");
+                yawLeftButtonCanvasGroup = yawLeftButton.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (yawRightButton != null)
+        {
+            yawRightButtonCanvasGroup = yawRightButton.GetComponent<CanvasGroup>();
+            if (yawRightButtonCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to yawRightButton");
+                yawRightButtonCanvasGroup = yawRightButton.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (zIncreaseButton != null)
+        {
+            zIncreaseButtonCanvasGroup = zIncreaseButton.GetComponent<CanvasGroup>();
+            if (zIncreaseButtonCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to zIncreaseButton");
+                zIncreaseButtonCanvasGroup = zIncreaseButton.AddComponent<CanvasGroup>();
+            }
+        }
+
+        if (zDecreaseButton != null)
+        {
+            zDecreaseButtonCanvasGroup = zDecreaseButton.GetComponent<CanvasGroup>();
+            if (zDecreaseButtonCanvasGroup == null)
+            {
+                Debug.LogWarning("StageManager: Adding CanvasGroup to zDecreaseButton");
+                zDecreaseButtonCanvasGroup = zDecreaseButton.AddComponent<CanvasGroup>();
+            }
+        }
     }
 
     private void OnConnectionButtonClicked()
@@ -156,7 +231,7 @@ public class StageManager : MonoBehaviour
 
     private void ActivateObjectPlacementStage()
     {
-        // Enable Object Placement UI
+        // Enable Object Placement UI (SetActive)
         SetUIActive(axialJoystick, true);
         SetUIActive(rotaryJoystick, true);
         SetUIActive(selectionPane, true);
@@ -164,6 +239,9 @@ public class StageManager : MonoBehaviour
         SetUIActive(yawRightButton, true);
         SetUIActive(zIncreaseButton, true);
         SetUIActive(zDecreaseButton, true);
+
+        // Update control visibility based on connection status
+        UpdateControlsVisibility();
 
         // Disable Object Detection UI
         SetUIActive(boundingBoxOverlay, false);
@@ -300,6 +378,45 @@ public class StageManager : MonoBehaviour
         }
 
         Debug.Log("Switched to Settings Stage");
+    }
+
+    // ===== CONTROL VISIBILITY MANAGEMENT =====
+
+    public void UpdateControlsVisibility()
+    {
+        if (WS_Client.Instance == null)
+        {
+            Debug.LogWarning("StageManager: WS_Client.Instance is null, defaulting to visible controls");
+            SetControlsAlpha(1.0f); // Default to visible
+            return;
+        }
+
+        bool isConnected = WS_Client.Instance.IsConnected;
+
+        if (isConnected)
+        {
+            // Connected = Remote mode = Hide controls
+            SetControlsAlpha(0.0f);
+            DebugViewController.AddDebugMessage("StageManager: Controls hidden (remote mode)");
+        }
+        else
+        {
+            // Disconnected = Local mode = Show controls
+            SetControlsAlpha(1.0f);
+            DebugViewController.AddDebugMessage("StageManager: Controls visible (local mode)");
+        }
+    }
+
+    private void SetControlsAlpha(float alpha)
+    {
+        if (axialJoystickCanvasGroup != null) axialJoystickCanvasGroup.alpha = alpha;
+        if (rotaryJoystickCanvasGroup != null) rotaryJoystickCanvasGroup.alpha = alpha;
+        if (yawLeftButtonCanvasGroup != null) yawLeftButtonCanvasGroup.alpha = alpha;
+        if (yawRightButtonCanvasGroup != null) yawRightButtonCanvasGroup.alpha = alpha;
+        if (zIncreaseButtonCanvasGroup != null) zIncreaseButtonCanvasGroup.alpha = alpha;
+        if (zDecreaseButtonCanvasGroup != null) zDecreaseButtonCanvasGroup.alpha = alpha;
+
+        Debug.Log($"StageManager: Set all control alphas to {alpha}");
     }
 
     private void SetUIActive(GameObject uiElement, bool active)
