@@ -7,8 +7,7 @@ using TMPro;
 public class SettingsMenuController : MonoBehaviour
 {
     [Header("User Connection Settings")]
-    [SerializeField] private TMP_InputField userIdInputField;
-    [SerializeField] private TMP_InputField sessionIdInputField;
+    [SerializeField] private TMP_InputField usernameInputField;
 
     [Header("Discrete Packet Debugging")]
     [SerializeField] private Button discretePacketToggleButton;
@@ -20,11 +19,10 @@ public class SettingsMenuController : MonoBehaviour
 
     // Global state variables
     private bool isDiscreteMode = false;
-    private int currentSliderValue = 10;  // Integer range: 1-20
+    private int currentSliderValue = 10;
 
     // Saved keys for PlayerPrefs
-    private const string PREF_USERID = "Settings_UserID";
-    private const string PREF_SESSIONID = "Settings_SessionID";
+    private const string PREF_USERNAME = "Settings_Username";
     private const string PREF_DISCRETE_MODE = "Settings_DiscreteMode";
     private const string PREF_SENSITIVITY = "Settings_Sensitivity";
 
@@ -66,13 +64,9 @@ public class SettingsMenuController : MonoBehaviour
             Debug.LogError("SettingsMenuController: sensitivitySlider is not assigned!");
         }
 
-        if (userIdInputField != null)
+        if (usernameInputField != null)
         {
-            userIdInputField.onEndEdit.AddListener(OnUserIdChanged);
-        }
-        if (sessionIdInputField != null)
-        {
-            sessionIdInputField.onEndEdit.AddListener(OnSessionIdChanged);
+            usernameInputField.onEndEdit.AddListener(OnUsernameChanged);
         }
 
         UpdateDiscretePacketUI();
@@ -260,7 +254,6 @@ public class SettingsMenuController : MonoBehaviour
         {
             if (currentSliderValue >= 20)
             {
-                // Already at maximum - ignore silently
                 return;
             }
             currentSliderValue++;
@@ -269,7 +262,6 @@ public class SettingsMenuController : MonoBehaviour
         {
             if (currentSliderValue <= 1)
             {
-                // Already at minimum - ignore silently
                 return;
             }
             currentSliderValue--;
@@ -282,7 +274,6 @@ public class SettingsMenuController : MonoBehaviour
 
         float newMultiplier = currentSliderValue / 10.0f;
 
-        // Update slider visually
         if (sensitivitySlider != null)
         {
             sensitivitySlider.value = currentSliderValue;
@@ -294,23 +285,15 @@ public class SettingsMenuController : MonoBehaviour
         PlayerPrefs.SetInt(PREF_SENSITIVITY, currentSliderValue);
         PlayerPrefs.Save();
 
-        // Detailed log
         DebugViewController.AddDebugMessage($"[COMMAND] Sensitivity {direction.ToUpper()}: {oldValue} → {currentSliderValue} ({oldMultiplier:F1}x → {newMultiplier:F1}x)");
     }
 
-    // ===== USER ID AND SESSION ID =====
+    // ===== USERNAME =====
 
-    private void OnUserIdChanged(string newUserId)
+    private void OnUsernameChanged(string newUsername)
     {
-        DebugViewController.AddDebugMessage($"UserID changed: '{newUserId}'");
-        PlayerPrefs.SetString(PREF_USERID, newUserId);
-        PlayerPrefs.Save();
-    }
-
-    private void OnSessionIdChanged(string newSessionId)
-    {
-        DebugViewController.AddDebugMessage($"SessionID changed: '{newSessionId}'");
-        PlayerPrefs.SetString(PREF_SESSIONID, newSessionId);
+        DebugViewController.AddDebugMessage($"Username changed: '{newUsername}'");
+        PlayerPrefs.SetString(PREF_USERNAME, newUsername);
         PlayerPrefs.Save();
     }
 
@@ -318,24 +301,14 @@ public class SettingsMenuController : MonoBehaviour
 
     private void LoadSettings()
     {
-        if (PlayerPrefs.HasKey(PREF_USERID))
+        if (PlayerPrefs.HasKey(PREF_USERNAME))
         {
-            string savedUserId = PlayerPrefs.GetString(PREF_USERID);
-            if (userIdInputField != null)
+            string savedUsername = PlayerPrefs.GetString(PREF_USERNAME);
+            if (usernameInputField != null)
             {
-                userIdInputField.text = savedUserId;
+                usernameInputField.text = savedUsername;
             }
-            DebugViewController.AddDebugMessage($"Loaded UserID: '{savedUserId}'");
-        }
-
-        if (PlayerPrefs.HasKey(PREF_SESSIONID))
-        {
-            string savedSessionId = PlayerPrefs.GetString(PREF_SESSIONID);
-            if (sessionIdInputField != null)
-            {
-                sessionIdInputField.text = savedSessionId;
-            }
-            DebugViewController.AddDebugMessage($"Loaded SessionID: '{savedSessionId}'");
+            DebugViewController.AddDebugMessage($"Loaded Username: '{savedUsername}'");
         }
 
         if (PlayerPrefs.HasKey(PREF_DISCRETE_MODE))
@@ -374,16 +347,15 @@ public class SettingsMenuController : MonoBehaviour
         float actualMultiplier = currentSliderValue / 10.0f;
         DebugViewController.AddDebugMessage($"Sensitivity: {currentSliderValue} ({actualMultiplier:F1}x) {(isDiscreteMode ? "(ignored in Discrete)" : "(active)")}");
 
-        string userId = userIdInputField != null ? userIdInputField.text : "";
-        string sessionId = sessionIdInputField != null ? sessionIdInputField.text : "";
+        string username = usernameInputField != null ? usernameInputField.text : "";
 
-        if (!string.IsNullOrEmpty(userId))
+        if (!string.IsNullOrEmpty(username))
         {
-            DebugViewController.AddDebugMessage($"UserID: {userId}");
+            DebugViewController.AddDebugMessage($"Username: {username}");
         }
-        if (!string.IsNullOrEmpty(sessionId))
+        else
         {
-            DebugViewController.AddDebugMessage($"SessionID: {sessionId}");
+            DebugViewController.AddDebugMessage("Username: (not set)");
         }
 
         if (ObjectManager.Instance != null)
@@ -405,14 +377,9 @@ public class SettingsMenuController : MonoBehaviour
         return currentSliderValue / 10.0f;
     }
 
-    public string GetUserId()
+    public string GetUsername()
     {
-        return userIdInputField != null ? userIdInputField.text : "";
-    }
-
-    public string GetSessionId()
-    {
-        return sessionIdInputField != null ? sessionIdInputField.text : "";
+        return usernameInputField != null ? usernameInputField.text : "";
     }
 
     public void ApplySettingsToObject(ControllableObject controllable)
