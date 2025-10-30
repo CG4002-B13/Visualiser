@@ -2084,7 +2084,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -7.5, y: -0.000061035156}
+  m_AnchoredPosition: {x: -7.5, y: -0.000030517578}
   m_SizeDelta: {x: -35.000008, y: 0}
   m_Pivot: {x: 1, y: 1}
 --- !u!114 &7332656741418832523
@@ -7182,7 +7182,7 @@ GameObject:
   - component: {fileID: 7316891261301578636}
   - component: {fileID: 2580439261759872051}
   m_Layer: 5
-  m_Name: UsernameInput
+  m_Name: UsernameInputField
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7464,7 +7464,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 6823143752649547223}
   m_HandleRect: {fileID: 6806370990999161845}
   m_Direction: 2
-  m_Value: 1
+  m_Value: 0
   m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
@@ -10366,7 +10366,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Show Controls
+  m_text: Hide Controls
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -10742,8 +10742,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aa521c3d3d88b4f9d801756880212a62, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  userIdInputField: {fileID: 2580439261759872051}
-  sessionIdInputField: {fileID: 0}
+  usernameInputField: {fileID: 2580439261759872051}
+  showControlsButton: {fileID: 5590234280011176239}
+  showControlsButtonText: {fileID: 5368297412894112060}
   discretePacketToggleButton: {fileID: 4284396080957705707}
   discretePacketButtonText: {fileID: 2070966084686209595}
   sensitivitySlider: {fileID: 7912314897903778201}
@@ -11098,7 +11099,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3904823896253791345, guid: 91799280ac1ea4691bad163f4c584f9a, type: 3}
       propertyPath: m_Value
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4301571218699421821, guid: 91799280ac1ea4691bad163f4c584f9a, type: 3}
       propertyPath: m_Name
@@ -11219,6 +11220,10 @@ PrefabInstance:
     - target: {fileID: 8100377916901661506, guid: 91799280ac1ea4691bad163f4c584f9a, type: 3}
       propertyPath: m_SizeDelta.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8100377916901661506, guid: 91799280ac1ea4691bad163f4c584f9a, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -0.000030517578
       objectReference: {fileID: 0}
     - target: {fileID: 8511259169753963329, guid: 91799280ac1ea4691bad163f4c584f9a, type: 3}
       propertyPath: m_IsActive
