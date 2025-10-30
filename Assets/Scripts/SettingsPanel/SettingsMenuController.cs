@@ -18,9 +18,9 @@ public class SettingsMenuController : MonoBehaviour
     [SerializeField] private Slider sensitivitySlider;
     [SerializeField] private TextMeshProUGUI sensitivityValueText;
 
-    // Global state variables (apply to ALL objects)
-    private bool isDiscreteMode = false;  // Default: OFF (Streaming Mode)
-    private float currentSensitivity = 1.0f;  // Default: 1.0 (standard)
+    // Global state variables
+    private bool isDiscreteMode = false;
+    private int currentSliderValue = 10;  // Integer range: 1-20
 
     // Saved keys for PlayerPrefs
     private const string PREF_USERID = "Settings_UserID";
@@ -28,15 +28,26 @@ public class SettingsMenuController : MonoBehaviour
     private const string PREF_DISCRETE_MODE = "Settings_DiscreteMode";
     private const string PREF_SENSITIVITY = "Settings_Sensitivity";
 
+    public static SettingsMenuController Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
     private void Start()
     {
-        // CRITICAL LOG: Settings initialization
         DebugViewController.AddDebugMessage("=== SETTINGS MENU INITIALIZED ===");
 
-        // Load saved settings
         LoadSettings();
 
-        // Setup button listener for Discrete Packet toggle
         if (discretePacketToggleButton != null)
         {
             discretePacketToggleButton.onClick.AddListener(ToggleDiscretePacketMode);
@@ -46,17 +57,15 @@ public class SettingsMenuController : MonoBehaviour
             Debug.LogError("SettingsMenuController: discretePacketToggleButton is not assigned!");
         }
 
-        // Setup slider listener for Controls Sensitivity
         if (sensitivitySlider != null)
         {
-            sensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
+            sensitivitySlider.onValueChanged.AddListener(OnSensitivitySliderChanged);
         }
         else
         {
             Debug.LogError("SettingsMenuController: sensitivitySlider is not assigned!");
         }
 
-        // Setup input field listeners
         if (userIdInputField != null)
         {
             userIdInputField.onEndEdit.AddListener(OnUserIdChanged);
@@ -66,24 +75,16 @@ public class SettingsMenuController : MonoBehaviour
             sessionIdInputField.onEndEdit.AddListener(OnSessionIdChanged);
         }
 
-        // Initialize UI to match current state
         UpdateDiscretePacketUI();
         UpdateSensitivityUI();
-
-        // Log current configuration
         LogCurrentConfiguration();
     }
 
     public void OnTabOpened()
     {
-        // Called when Settings tab is opened
         DebugViewController.AddDebugMessage("--- Settings Tab Opened ---");
-
-        // Refresh UI to show current state
         UpdateDiscretePacketUI();
         UpdateSensitivityUI();
-
-        // Show current config
         LogCurrentConfiguration();
     }
 
@@ -91,27 +92,19 @@ public class SettingsMenuController : MonoBehaviour
 
     private void ToggleDiscretePacketMode()
     {
-        // Toggle state
         isDiscreteMode = !isDiscreteMode;
 
-        // CRITICAL LOG: Mode toggle
         DebugViewController.AddDebugMessage("=====================================");
         DebugViewController.AddDebugMessage($"MODE TOGGLE: {(isDiscreteMode ? "Streaming → Discrete" : "Discrete → Streaming")}");
         DebugViewController.AddDebugMessage("=====================================");
 
-        // Update UI
         UpdateDiscretePacketUI();
-
-        // Apply mode change to ALL objects (not just selected one)
         ApplyGlobalDataFlowMode();
 
-        // Save preference
         PlayerPrefs.SetInt(PREF_DISCRETE_MODE, isDiscreteMode ? 1 : 0);
         PlayerPrefs.Save();
 
         DebugViewController.AddDebugMessage($"Settings saved: DiscreteMode={isDiscreteMode}");
-
-        // Log new configuration
         LogCurrentConfiguration();
     }
 
@@ -122,28 +115,21 @@ public class SettingsMenuController : MonoBehaviour
             discretePacketButtonText.text = isDiscreteMode ? "ON" : "OFF";
         }
 
-        // Change button color based on state
         if (discretePacketToggleButton != null)
         {
             ColorBlock colors = discretePacketToggleButton.colors;
             if (isDiscreteMode)
             {
-                // ON state - green tint
                 colors.normalColor = new Color(0.7f, 1.0f, 0.7f);
             }
             else
             {
-                // OFF state - white/default
                 colors.normalColor = new Color(1.0f, 1.0f, 1.0f);
             }
             discretePacketToggleButton.colors = colors;
         }
     }
 
-    /// <summary>
-    /// Apply the current global data flow mode to ALL instantiated objects
-    /// This ensures consistent behavior across all furniture
-    /// </summary>
     private void ApplyGlobalDataFlowMode()
     {
         if (ObjectManager.Instance == null)
@@ -156,7 +142,6 @@ public class SettingsMenuController : MonoBehaviour
             ? VirtualJoystickState.DataFlowMode.Discrete
             : VirtualJoystickState.DataFlowMode.Streaming;
 
-        // Get all instantiated objects
         Dictionary<string, GameObject> allObjects = ObjectManager.Instance.GetInstantiatedObjects();
 
         if (allObjects.Count == 0)
@@ -166,7 +151,6 @@ public class SettingsMenuController : MonoBehaviour
             return;
         }
 
-        // Apply mode to ALL objects
         int successCount = 0;
         foreach (var kvp in allObjects)
         {
@@ -186,7 +170,6 @@ public class SettingsMenuController : MonoBehaviour
             }
         }
 
-        // CRITICAL LOG: Mode applied to objects
         DebugViewController.AddDebugMessage($"✓ Mode {mode} applied to {successCount}/{allObjects.Count} objects");
 
         if (successCount < allObjects.Count)
@@ -197,35 +180,29 @@ public class SettingsMenuController : MonoBehaviour
 
     // ===== CONTROLS SENSITIVITY SLIDER =====
 
-    private void OnSensitivityChanged(float value)
+    private void OnSensitivitySliderChanged(float sliderValue)
     {
-        float oldSensitivity = currentSensitivity;
-        currentSensitivity = value;
+        int newSliderValue = Mathf.RoundToInt(sliderValue);
 
-        // Update UI text
+        if (newSliderValue == currentSliderValue) return;
+
+        int oldSliderValue = currentSliderValue;
+        currentSliderValue = newSliderValue;
+
         UpdateSensitivityUI();
-
-        // Apply sensitivity to ALL objects
         ApplyGlobalSensitivity();
 
-        // Save preference
-        PlayerPrefs.SetFloat(PREF_SENSITIVITY, currentSensitivity);
+        PlayerPrefs.SetInt(PREF_SENSITIVITY, currentSliderValue);
         PlayerPrefs.Save();
 
-        // DETAILED LOG: Sensitivity change
-        if (Mathf.Abs(oldSensitivity - currentSensitivity) > 0.01f)
-        {
-            DebugViewController.AddDebugMessage($"Sensitivity: {oldSensitivity:F2}x → {currentSensitivity:F2}x");
+        float oldMultiplier = oldSliderValue / 10.0f;
+        float newMultiplier = currentSliderValue / 10.0f;
 
-            if (isDiscreteMode)
-            {
-                DebugViewController.AddDebugMessage("Note: Sensitivity ignored in Discrete Mode");
-            }
-            else
-            {
-                DebugViewController.AddDebugMessage($"Effective Accel Scale: ~{0.3f * currentSensitivity:F3}");
-                DebugViewController.AddDebugMessage($"Effective Gyro Scale: ~{0.8f * currentSensitivity:F3}");
-            }
+        DebugViewController.AddDebugMessage($"Sensitivity: {oldSliderValue} ({oldMultiplier:F1}x) → {currentSliderValue} ({newMultiplier:F1}x)");
+
+        if (isDiscreteMode)
+        {
+            DebugViewController.AddDebugMessage("Note: Sensitivity ignored in Discrete Mode");
         }
     }
 
@@ -233,22 +210,20 @@ public class SettingsMenuController : MonoBehaviour
     {
         if (sensitivityValueText != null)
         {
-            sensitivityValueText.text = $"Controls Sensitivity ({currentSensitivity:F3})";
+            float actualMultiplier = currentSliderValue / 10.0f;
+            sensitivityValueText.text = $"Sensitivity: {currentSliderValue}  ({actualMultiplier:F1}x)";
         }
     }
 
-    /// <summary>
-    /// Apply sensitivity multiplier to ALL instantiated objects
-    /// </summary>
     private void ApplyGlobalSensitivity()
     {
         if (ObjectManager.Instance == null) return;
 
+        float actualSensitivity = currentSliderValue / 10.0f;
         Dictionary<string, GameObject> allObjects = ObjectManager.Instance.GetInstantiatedObjects();
 
         if (allObjects.Count == 0) return;
 
-        // Apply sensitivity to ALL objects
         int successCount = 0;
         foreach (var kvp in allObjects)
         {
@@ -261,18 +236,66 @@ public class SettingsMenuController : MonoBehaviour
                     VirtualJoystickState virtualState = controllable.GetVirtualState();
                     if (virtualState != null)
                     {
-                        virtualState.SetSensitivityMultiplier(currentSensitivity);
+                        virtualState.SetSensitivityMultiplier(actualSensitivity);
                         successCount++;
                     }
                 }
             }
         }
 
-        // Only log if there were objects to update
         if (successCount > 0)
         {
-            DebugViewController.AddDebugMessage($"Sensitivity {currentSensitivity:F2}x applied to {successCount} objects");
+            DebugViewController.AddDebugMessage($"Sensitivity {actualSensitivity:F1}x applied to {successCount} objects");
         }
+    }
+
+    // ===== COMMAND-BASED SENSITIVITY ADJUSTMENT =====
+
+    public void AdjustSensitivity(string direction)
+    {
+        int oldValue = currentSliderValue;
+        float oldMultiplier = oldValue / 10.0f;
+
+        if (direction.ToLower() == "up")
+        {
+            if (currentSliderValue >= 20)
+            {
+                // Already at maximum - ignore silently
+                return;
+            }
+            currentSliderValue++;
+        }
+        else if (direction.ToLower() == "down")
+        {
+            if (currentSliderValue <= 1)
+            {
+                // Already at minimum - ignore silently
+                return;
+            }
+            currentSliderValue--;
+        }
+        else
+        {
+            Debug.LogWarning($"Unknown sensitivity direction: {direction}");
+            return;
+        }
+
+        float newMultiplier = currentSliderValue / 10.0f;
+
+        // Update slider visually
+        if (sensitivitySlider != null)
+        {
+            sensitivitySlider.value = currentSliderValue;
+        }
+
+        UpdateSensitivityUI();
+        ApplyGlobalSensitivity();
+
+        PlayerPrefs.SetInt(PREF_SENSITIVITY, currentSliderValue);
+        PlayerPrefs.Save();
+
+        // Detailed log
+        DebugViewController.AddDebugMessage($"[COMMAND] Sensitivity {direction.ToUpper()}: {oldValue} → {currentSliderValue} ({oldMultiplier:F1}x → {newMultiplier:F1}x)");
     }
 
     // ===== USER ID AND SESSION ID =====
@@ -282,8 +305,6 @@ public class SettingsMenuController : MonoBehaviour
         DebugViewController.AddDebugMessage($"UserID changed: '{newUserId}'");
         PlayerPrefs.SetString(PREF_USERID, newUserId);
         PlayerPrefs.Save();
-
-        // TODO: Future - update WebSocket connection with new UserID
     }
 
     private void OnSessionIdChanged(string newSessionId)
@@ -291,15 +312,12 @@ public class SettingsMenuController : MonoBehaviour
         DebugViewController.AddDebugMessage($"SessionID changed: '{newSessionId}'");
         PlayerPrefs.SetString(PREF_SESSIONID, newSessionId);
         PlayerPrefs.Save();
-
-        // TODO: Future - update WebSocket connection with new SessionID
     }
 
     // ===== SETTINGS PERSISTENCE =====
 
     private void LoadSettings()
     {
-        // Load UserID
         if (PlayerPrefs.HasKey(PREF_USERID))
         {
             string savedUserId = PlayerPrefs.GetString(PREF_USERID);
@@ -310,7 +328,6 @@ public class SettingsMenuController : MonoBehaviour
             DebugViewController.AddDebugMessage($"Loaded UserID: '{savedUserId}'");
         }
 
-        // Load SessionID
         if (PlayerPrefs.HasKey(PREF_SESSIONID))
         {
             string savedSessionId = PlayerPrefs.GetString(PREF_SESSIONID);
@@ -321,7 +338,6 @@ public class SettingsMenuController : MonoBehaviour
             DebugViewController.AddDebugMessage($"Loaded SessionID: '{savedSessionId}'");
         }
 
-        // Load Discrete Mode state
         if (PlayerPrefs.HasKey(PREF_DISCRETE_MODE))
         {
             isDiscreteMode = PlayerPrefs.GetInt(PREF_DISCRETE_MODE) == 1;
@@ -329,39 +345,34 @@ public class SettingsMenuController : MonoBehaviour
         }
         else
         {
-            isDiscreteMode = false;  // Default: Streaming Mode (OFF)
+            isDiscreteMode = false;
             DebugViewController.AddDebugMessage("DiscreteMode: DEFAULT (Streaming)");
         }
 
-        // Load Sensitivity
         if (PlayerPrefs.HasKey(PREF_SENSITIVITY))
         {
-            currentSensitivity = PlayerPrefs.GetFloat(PREF_SENSITIVITY);
-            DebugViewController.AddDebugMessage($"Loaded Sensitivity: {currentSensitivity:F2}x");
+            currentSliderValue = PlayerPrefs.GetInt(PREF_SENSITIVITY);
+            currentSliderValue = Mathf.Clamp(currentSliderValue, 1, 20);
+            DebugViewController.AddDebugMessage($"Loaded Sensitivity: {currentSliderValue} ({(currentSliderValue / 10.0f):F1}x)");
         }
         else
         {
-            currentSensitivity = 1.0f;  // Default: 1.0
-            DebugViewController.AddDebugMessage("Sensitivity: DEFAULT (1.0x)");
+            currentSliderValue = 10;
+            DebugViewController.AddDebugMessage("Sensitivity: DEFAULT (10 = 1.0x)");
         }
 
-        // Apply loaded sensitivity to slider
         if (sensitivitySlider != null)
         {
-            sensitivitySlider.value = currentSensitivity;
+            sensitivitySlider.value = currentSliderValue;
         }
     }
 
-    // ===== LOGGING UTILITIES =====
-
-    /// <summary>
-    /// Log current configuration to debug panel
-    /// </summary>
     private void LogCurrentConfiguration()
     {
         DebugViewController.AddDebugMessage("--- Current Settings ---");
         DebugViewController.AddDebugMessage($"Data Mode: {(isDiscreteMode ? "Discrete Packets" : "Streaming (30Hz)")}");
-        DebugViewController.AddDebugMessage($"Sensitivity: {currentSensitivity:F2}x {(isDiscreteMode ? "(ignored in Discrete)" : "(active)")}");
+        float actualMultiplier = currentSliderValue / 10.0f;
+        DebugViewController.AddDebugMessage($"Sensitivity: {currentSliderValue} ({actualMultiplier:F1}x) {(isDiscreteMode ? "(ignored in Discrete)" : "(active)")}");
 
         string userId = userIdInputField != null ? userIdInputField.text : "";
         string sessionId = sessionIdInputField != null ? sessionIdInputField.text : "";
@@ -375,7 +386,6 @@ public class SettingsMenuController : MonoBehaviour
             DebugViewController.AddDebugMessage($"SessionID: {sessionId}");
         }
 
-        // Count objects
         if (ObjectManager.Instance != null)
         {
             int objectCount = ObjectManager.Instance.GetInstantiatedObjects().Count;
@@ -383,7 +393,7 @@ public class SettingsMenuController : MonoBehaviour
         }
     }
 
-    // ===== PUBLIC METHODS (for other scripts to query/modify settings) =====
+    // ===== PUBLIC METHODS =====
 
     public bool IsDiscreteMode()
     {
@@ -392,7 +402,7 @@ public class SettingsMenuController : MonoBehaviour
 
     public float GetSensitivity()
     {
-        return currentSensitivity;
+        return currentSliderValue / 10.0f;
     }
 
     public string GetUserId()
@@ -405,10 +415,6 @@ public class SettingsMenuController : MonoBehaviour
         return sessionIdInputField != null ? sessionIdInputField.text : "";
     }
 
-    /// <summary>
-    /// Called by ObjectManager when a new object is selected or instantiated
-    /// Applies current global settings to the object
-    /// </summary>
     public void ApplySettingsToObject(ControllableObject controllable)
     {
         if (controllable == null) return;
@@ -416,30 +422,14 @@ public class SettingsMenuController : MonoBehaviour
         VirtualJoystickState virtualState = controllable.GetVirtualState();
         if (virtualState == null) return;
 
-        // Apply current global mode
         VirtualJoystickState.DataFlowMode mode = isDiscreteMode
             ? VirtualJoystickState.DataFlowMode.Discrete
             : VirtualJoystickState.DataFlowMode.Streaming;
 
+        float actualSensitivity = currentSliderValue / 10.0f;
         virtualState.SetDataFlowMode(mode);
-        virtualState.SetSensitivityMultiplier(currentSensitivity);
+        virtualState.SetSensitivityMultiplier(actualSensitivity);
 
-        // CRITICAL LOG: Settings applied to new object
-        DebugViewController.AddDebugMessage($"✓ Settings applied to '{controllable.gameObject.name}': Mode={mode}, Sensitivity={currentSensitivity:F2}x");
-    }
-
-    // Make this accessible as a singleton for other scripts
-    public static SettingsMenuController Instance { get; private set; }
-
-    private void Awake()
-    {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        DebugViewController.AddDebugMessage($"✓ Settings applied to '{controllable.gameObject.name}': Mode={mode}, Sensitivity={actualSensitivity:F1}x");
     }
 }
