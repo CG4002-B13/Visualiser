@@ -33,7 +33,7 @@ public class VirtualJoystickState : MonoBehaviour
     [Tooltip("Scale accelerometer data to joystick range")]
     [SerializeField] private float accelerometerScale = 0.3f;
     [Tooltip("Scale gyroscope data to joystick range")]
-    [SerializeField] private float gyroscopeScale = 1.0f;  // CHANGED from 0.8
+    [SerializeField] private float gyroscopeScale = 1.0f;
 
     [Header("Movement Limits")]
     [Tooltip("Maximum distance per discrete packet (Unity units)")]
@@ -50,16 +50,16 @@ public class VirtualJoystickState : MonoBehaviour
     [Tooltip("Accelerometer Z-axis thresholds for Z-movement buttons")]
     [SerializeField] private float zForwardThreshold = 1.5f;
     [SerializeField] private float zBackwardThreshold = -1.5f;
-    [Tooltip("Gyroscope Y-axis thresholds for yaw buttons (degrees/sec)")]
-    [SerializeField] private float yawLeftThreshold = 0.5f;    // CHANGED from 20
-    [SerializeField] private float yawRightThreshold = -0.5f;  // CHANGED from -20
+    [Tooltip("Gyroscope Y-axis thresholds for yaw buttons")]
+    [SerializeField] private float yawLeftThreshold = 0.5f;
+    [SerializeField] private float yawRightThreshold = -0.5f;
 
     // ===== VIRTUAL JOYSTICK STATE =====
     private float currentAxialHorizontal = 0f;
     private float currentAxialVertical = 0f;
     private float currentRotaryHorizontal = 0f;
     private float currentRotaryVertical = 0f;
-    private float currentYaw = 0f;  // NEW: Continuous yaw value
+    private float currentYaw = 0f;
     private bool currentZForward = false;
     private bool currentZBackward = false;
     private bool currentYawLeft = false;
@@ -70,7 +70,7 @@ public class VirtualJoystickState : MonoBehaviour
     private float targetAxialVertical = 0f;
     private float targetRotaryHorizontal = 0f;
     private float targetRotaryVertical = 0f;
-    private float targetYaw = 0f;  // NEW: Target yaw for streaming
+    private float targetYaw = 0f;
 
     // Discrete mode impulse tracking
     private float impulseTimer = 0f;
@@ -82,12 +82,12 @@ public class VirtualJoystickState : MonoBehaviour
     // Timeout tracking for streaming mode
     private float timeSinceLastPacket = 0f;
 
-    // NEW: Sensitivity multiplier (controlled by Settings UI)
+    // Sensitivity multiplier (controlled by Settings UI)
     private float sensitivityMultiplier = 1.0f;
 
     // Logging control - reduce spam
     private float logThrottleTimer = 0f;
-    private const float LOG_THROTTLE_INTERVAL = 1.0f; // Log state max once per second
+    private const float LOG_THROTTLE_INTERVAL = 1.0f;
 
     // ===== PUBLIC GETTERS =====
 
@@ -98,7 +98,7 @@ public class VirtualJoystickState : MonoBehaviour
     public float GetAxialVertical() => currentAxialVertical;
     public float GetRotaryHorizontal() => currentRotaryHorizontal;
     public float GetRotaryVertical() => currentRotaryVertical;
-    public float GetYaw() => currentYaw;  // NEW: Getter for continuous yaw
+    public float GetYaw() => currentYaw;
     public bool GetZForward() => currentZForward;
     public bool GetZBackward() => currentZBackward;
     public bool GetYawLeft() => currentYawLeft;
@@ -129,7 +129,6 @@ public class VirtualJoystickState : MonoBehaviour
         dataMode = mode;
         ResetState();
 
-        // CRITICAL LOG: Mode change
         DebugViewController.AddDebugMessage($"=== MODE CHANGE ===");
         DebugViewController.AddDebugMessage($"[{gameObject.name}] {oldMode} → {mode}");
 
@@ -147,13 +146,11 @@ public class VirtualJoystickState : MonoBehaviour
         Debug.Log($"VirtualJoystickState [{gameObject.name}]: Mode set to {mode}");
     }
 
-    // NEW: Sensitivity multiplier control
     public void SetSensitivityMultiplier(float multiplier)
     {
         float oldMultiplier = sensitivityMultiplier;
         sensitivityMultiplier = Mathf.Clamp(multiplier, 0f, 3f);
 
-        // CRITICAL LOG: Sensitivity change
         if (Mathf.Abs(oldMultiplier - sensitivityMultiplier) > 0.01f)
         {
             DebugViewController.AddDebugMessage($"[{gameObject.name}] Sensitivity: {oldMultiplier:F2}x → {sensitivityMultiplier:F2}x");
@@ -178,62 +175,51 @@ public class VirtualJoystickState : MonoBehaviour
     {
         if (!isRemoteControlled) return;
 
-        // Reset timeout timer (packet received)
         timeSinceLastPacket = 0f;
 
-        // Map X/Y to axial joystick
         float rawH = accelData.x;
         float rawV = accelData.y;
 
-        // Apply different scaling based on mode
         if (dataMode == DataFlowMode.Streaming)
         {
-            // Streaming: Standard scaling WITH sensitivity multiplier
             rawH *= accelerometerScale * sensitivityMultiplier;
             rawV *= accelerometerScale * sensitivityMultiplier;
         }
         else
         {
-            // Discrete: Heavy scaling (sensitivity ignored for consistency)
             rawH *= discretePacketScale;
             rawV *= discretePacketScale;
         }
 
-        // Apply deadzone
         rawH = ApplyDeadzone(rawH, axialDeadzone);
         rawV = ApplyDeadzone(rawV, axialDeadzone);
 
-        // Clamp to joystick range
-        rawH = Mathf.Clamp(rawH, -1f, 1f);
-        rawV = Mathf.Clamp(rawV, -1f, 1f);
+        // Dynamic clamp based on sensitivity
+        float dynamicClamp = GetDynamicClamp();
+        rawH = Mathf.Clamp(rawH, -dynamicClamp, dynamicClamp);
+        rawV = Mathf.Clamp(rawV, -dynamicClamp, dynamicClamp);
 
-        // Map Z-axis to forward/backward buttons
         currentZForward = accelData.z > zForwardThreshold;
         currentZBackward = accelData.z < zBackwardThreshold;
 
         if (dataMode == DataFlowMode.Streaming)
         {
-            // Streaming: set as target for smooth interpolation
             targetAxialHorizontal = rawH;
             targetAxialVertical = rawV;
 
-            // DETAILED LOG: Streaming packet received
-            DebugViewController.AddDebugMessage($"[STREAM] Raw:[{accelData.x:F2},{accelData.y:F2},{accelData.z:F2}] → Target:[{rawH:F2},{rawV:F2}]");
+            DebugViewController.AddDebugMessage($"[STREAM] Raw:[{accelData.x:F2},{accelData.y:F2},{accelData.z:F2}] → Target:[{rawH:F2},{rawV:F2}] Clamp:±{dynamicClamp:F2}");
         }
         else
         {
-            // Discrete: set as impulse with distance clamping
             Vector3 impulseVector = new Vector3(rawH, rawV, 0f);
             float impulseMagnitude = impulseVector.magnitude;
 
-            // Clamp to max discrete distance
             if (impulseMagnitude > maxDiscreteDistance)
             {
                 impulseVector = impulseVector.normalized * maxDiscreteDistance;
                 rawH = impulseVector.x;
                 rawV = impulseVector.y;
 
-                // CRITICAL LOG: Clamping occurred
                 DebugViewController.AddDebugMessage($"[DISCRETE] Impulse clamped: {impulseMagnitude:F3} → {maxDiscreteDistance:F3}");
             }
 
@@ -241,7 +227,6 @@ public class VirtualJoystickState : MonoBehaviour
             impulseAxialV = rawV;
             impulseTimer = impulseDuration;
 
-            // DETAILED LOG: Discrete packet received
             DebugViewController.AddDebugMessage($"[DISCRETE] Raw:[{accelData.x:F2},{accelData.y:F2},{accelData.z:F2}] → Impulse:[{rawH:F3},{rawV:F3}] for {impulseDuration}s");
         }
     }
@@ -250,62 +235,52 @@ public class VirtualJoystickState : MonoBehaviour
     {
         if (!isRemoteControlled) return;
 
-        // Reset timeout timer (packet received)
         timeSinceLastPacket = 0f;
 
-        // Map gyroscope axes
         float rawPitch = gyroData.x;
-        float rawYaw = gyroData.y;    // NEW: Process yaw as continuous
+        float rawYaw = gyroData.y;
         float rawRoll = gyroData.z;
 
-        // Apply different scaling based on mode
         if (dataMode == DataFlowMode.Streaming)
         {
-            // Streaming: Standard scaling WITH sensitivity multiplier
             rawPitch *= gyroscopeScale * sensitivityMultiplier;
-            rawYaw *= gyroscopeScale * sensitivityMultiplier;    // NEW: Scale yaw
+            rawYaw *= gyroscopeScale * sensitivityMultiplier;
             rawRoll *= gyroscopeScale * sensitivityMultiplier;
         }
         else
         {
-            // Discrete: Heavy scaling (sensitivity ignored)
             rawPitch *= discretePacketScale;
-            rawYaw *= discretePacketScale;    // NEW: Scale yaw
+            rawYaw *= discretePacketScale;
             rawRoll *= discretePacketScale;
         }
 
-        // Apply deadzone
         rawPitch = ApplyDeadzone(rawPitch, rotaryDeadzone);
-        rawYaw = ApplyDeadzone(rawYaw, rotaryDeadzone);    // NEW: Deadzone for yaw
+        rawYaw = ApplyDeadzone(rawYaw, rotaryDeadzone);
         rawRoll = ApplyDeadzone(rawRoll, rotaryDeadzone);
 
-        // Clamp to joystick range
-        rawPitch = Mathf.Clamp(rawPitch, -1f, 1f);
-        rawYaw = Mathf.Clamp(rawYaw, -1f, 1f);    // NEW: Clamp yaw
-        rawRoll = Mathf.Clamp(rawRoll, -1f, 1f);
+        // Dynamic clamp based on sensitivity
+        float dynamicClamp = GetDynamicClamp();
+        rawPitch = Mathf.Clamp(rawPitch, -dynamicClamp, dynamicClamp);
+        rawYaw = Mathf.Clamp(rawYaw, -dynamicClamp, dynamicClamp);
+        rawRoll = Mathf.Clamp(rawRoll, -dynamicClamp, dynamicClamp);
 
-        // Map Y-axis (yaw) to yaw buttons (keep button functionality)
         currentYawLeft = gyroData.y > yawLeftThreshold;
         currentYawRight = gyroData.y < yawRightThreshold;
 
         if (dataMode == DataFlowMode.Streaming)
         {
-            // Streaming: set as target
             targetRotaryVertical = rawPitch;
-            targetYaw = rawYaw;    // NEW: Set target yaw
+            targetYaw = rawYaw;
             targetRotaryHorizontal = rawRoll;
 
-            // DETAILED LOG: Streaming rotation packet
-            DebugViewController.AddDebugMessage($"[STREAM-ROT] Raw:[{gyroData.x:F2},{gyroData.y:F2},{gyroData.z:F2}] → Target:[pitch={rawPitch:F2},yaw={rawYaw:F2},roll={rawRoll:F2}]");
+            DebugViewController.AddDebugMessage($"[STREAM-ROT] Raw:[{gyroData.x:F2},{gyroData.y:F2},{gyroData.z:F2}] → Target:[pitch={rawPitch:F2},yaw={rawYaw:F2},roll={rawRoll:F2}] Clamp:±{dynamicClamp:F2}");
         }
         else
         {
-            // Discrete: set as impulse
             impulseRotaryV = rawPitch;
             impulseRotaryH = rawRoll;
             impulseTimer = impulseDuration;
 
-            // DETAILED LOG: Discrete rotation packet
             DebugViewController.AddDebugMessage($"[DISCRETE-ROT] Raw:[{gyroData.x:F2},{gyroData.y:F2},{gyroData.z:F2}] → Impulse:[pitch={rawPitch:F3},yaw={rawYaw:F3},roll={rawRoll:F3}]");
         }
     }
@@ -316,7 +291,6 @@ public class VirtualJoystickState : MonoBehaviour
     {
         if (!isRemoteControlled) return;
 
-        // Throttled state logging
         logThrottleTimer += Time.deltaTime;
 
         if (dataMode == DataFlowMode.Streaming)
@@ -333,41 +307,35 @@ public class VirtualJoystickState : MonoBehaviour
     {
         float deltaTime = Time.deltaTime;
 
-        // Track time since last packet
         timeSinceLastPacket += deltaTime;
 
-        // Timeout detection - auto-release joystick
         if (timeSinceLastPacket > streamingTimeout)
         {
-            // CRITICAL LOG: Timeout triggered (only log once)
             if (targetAxialHorizontal != 0f || targetAxialVertical != 0f ||
-                targetRotaryHorizontal != 0f || targetRotaryVertical != 0f || targetYaw != 0f)  // ADDED targetYaw
+                targetRotaryHorizontal != 0f || targetRotaryVertical != 0f || targetYaw != 0f)
             {
-                DebugViewController.AddDebugMessage($" [{gameObject.name}] TIMEOUT: No packets for {timeSinceLastPacket:F2}s → Auto-releasing joystick");
+                DebugViewController.AddDebugMessage($"[{gameObject.name}] TIMEOUT: No packets for {timeSinceLastPacket:F2}s → Auto-releasing joystick");
             }
 
-            // No packets received recently - return to neutral
             targetAxialHorizontal = 0f;
             targetAxialVertical = 0f;
             targetRotaryHorizontal = 0f;
             targetRotaryVertical = 0f;
-            targetYaw = 0f;  // NEW: Reset yaw target
+            targetYaw = 0f;
             currentZForward = false;
             currentZBackward = false;
             currentYawLeft = false;
             currentYawRight = false;
         }
 
-        // Lerp toward target values
         float lerpFactor = smoothingSpeed * deltaTime;
 
         currentAxialHorizontal = Mathf.Lerp(currentAxialHorizontal, targetAxialHorizontal, lerpFactor);
         currentAxialVertical = Mathf.Lerp(currentAxialVertical, targetAxialVertical, lerpFactor);
         currentRotaryHorizontal = Mathf.Lerp(currentRotaryHorizontal, targetRotaryHorizontal, lerpFactor);
         currentRotaryVertical = Mathf.Lerp(currentRotaryVertical, targetRotaryVertical, lerpFactor);
-        currentYaw = Mathf.Lerp(currentYaw, targetYaw, lerpFactor);  // NEW: Lerp yaw
+        currentYaw = Mathf.Lerp(currentYaw, targetYaw, lerpFactor);
 
-        // Apply max speed clamp for streaming mode
         float currentSpeed = new Vector3(currentAxialHorizontal, currentAxialVertical, 0f).magnitude;
         if (currentSpeed > maxStreamingSpeed)
         {
@@ -375,14 +343,12 @@ public class VirtualJoystickState : MonoBehaviour
             currentAxialHorizontal = clampedVector.x;
             currentAxialVertical = clampedVector.y;
 
-            // CRITICAL LOG: Speed clamping
             if (logThrottleTimer >= LOG_THROTTLE_INTERVAL)
             {
-                DebugViewController.AddDebugMessage($" [{gameObject.name}] Speed clamped: {currentSpeed:F2} → {maxStreamingSpeed:F2}");
+                DebugViewController.AddDebugMessage($"[{gameObject.name}] Speed clamped: {currentSpeed:F2} → {maxStreamingSpeed:F2}");
             }
         }
 
-        // Periodic state logging
         if (logThrottleTimer >= LOG_THROTTLE_INTERVAL)
         {
             if (currentAxialHorizontal != 0f || currentAxialVertical != 0f)
@@ -399,17 +365,14 @@ public class VirtualJoystickState : MonoBehaviour
 
         if (impulseTimer > 0f)
         {
-            // Impulse is active
             impulseTimer -= deltaTime;
 
-            // Linear decay during impulse duration
             float t = Mathf.Max(0f, impulseTimer / impulseDuration);
             currentAxialHorizontal = impulseAxialH * t;
             currentAxialVertical = impulseAxialV * t;
             currentRotaryHorizontal = impulseRotaryH * t;
             currentRotaryVertical = impulseRotaryV * t;
 
-            // CRITICAL LOG: Impulse ending
             if (impulseTimer <= 0f)
             {
                 DebugViewController.AddDebugMessage($"[DISCRETE] Impulse completed → Starting decay");
@@ -417,14 +380,12 @@ public class VirtualJoystickState : MonoBehaviour
         }
         else
         {
-            // Impulse finished - fast decay to zero
             float decayFactor = decaySpeed * deltaTime;
             currentAxialHorizontal = Mathf.Lerp(currentAxialHorizontal, 0f, decayFactor);
             currentAxialVertical = Mathf.Lerp(currentAxialVertical, 0f, decayFactor);
             currentRotaryHorizontal = Mathf.Lerp(currentRotaryHorizontal, 0f, decayFactor);
             currentRotaryVertical = Mathf.Lerp(currentRotaryVertical, 0f, decayFactor);
 
-            // Auto-disable buttons when values near zero
             if (Mathf.Abs(currentAxialHorizontal) < 0.01f && Mathf.Abs(currentAxialVertical) < 0.01f)
             {
                 currentZForward = false;
@@ -437,7 +398,6 @@ public class VirtualJoystickState : MonoBehaviour
             }
         }
 
-        // Periodic state logging for discrete mode
         if (logThrottleTimer >= LOG_THROTTLE_INTERVAL)
         {
             if (impulseTimer > 0f || Mathf.Abs(currentAxialHorizontal) > 0.01f)
@@ -459,18 +419,23 @@ public class VirtualJoystickState : MonoBehaviour
         return value;
     }
 
+    private float GetDynamicClamp()
+    {
+        return Mathf.Max(1.0f, sensitivityMultiplier);
+    }
+
     public void ResetState()
     {
         currentAxialHorizontal = 0f;
         currentAxialVertical = 0f;
         currentRotaryHorizontal = 0f;
         currentRotaryVertical = 0f;
-        currentYaw = 0f;  // NEW
+        currentYaw = 0f;
         targetAxialHorizontal = 0f;
         targetAxialVertical = 0f;
         targetRotaryHorizontal = 0f;
         targetRotaryVertical = 0f;
-        targetYaw = 0f;  // NEW
+        targetYaw = 0f;
         currentZForward = false;
         currentZBackward = false;
         currentYawLeft = false;
@@ -490,7 +455,7 @@ public class VirtualJoystickState : MonoBehaviour
         return $"Mode: {dataMode}\n" +
                $"Axial: ({currentAxialHorizontal:F2}, {currentAxialVertical:F2})\n" +
                $"Rotary: ({currentRotaryHorizontal:F2}, {currentRotaryVertical:F2})\n" +
-               $"Yaw: {currentYaw:F2}\n" +  // NEW
+               $"Yaw: {currentYaw:F2}\n" +
                $"Timeout: {timeSinceLastPacket:F2}s\n" +
                $"Sensitivity: {sensitivityMultiplier:F2}x";
     }
