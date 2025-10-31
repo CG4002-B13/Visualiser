@@ -74,6 +74,14 @@ public class CommandHandler : MonoBehaviour
                     HandleSetCommand(messageObj);
                     break;
 
+                case "S3_UPLOAD_RESPONSE":
+                    HandleS3UploadResponse(messageObj);
+                    break;
+
+                case "S3_ERROR":
+                    HandleS3Error(messageObj);
+                    break;
+
                 default:
                     Debug.LogWarning($"CommandHandler: Unknown eventType '{eventType}'");
                     break;
@@ -247,10 +255,8 @@ public class CommandHandler : MonoBehaviour
 
             DebugViewController.AddDebugMessage($"Set command: {command} → {result}");
 
-            // Route based on result value
             if (result.ToUpper() == "UP")
             {
-                // Increase sensitivity
                 if (SettingsMenuController.Instance != null)
                 {
                     SettingsMenuController.Instance.AdjustSensitivity("up");
@@ -262,7 +268,6 @@ public class CommandHandler : MonoBehaviour
             }
             else if (result.ToUpper() == "DOWN")
             {
-                // Decrease sensitivity
                 if (SettingsMenuController.Instance != null)
                 {
                     SettingsMenuController.Instance.AdjustSensitivity("down");
@@ -274,7 +279,6 @@ public class CommandHandler : MonoBehaviour
             }
             else if (result.ToUpper() == "ODM")
             {
-                // Toggle Object Detection Mode
                 DebugViewController.AddDebugMessage("ODM toggle command received");
 
                 if (StageManager.Instance != null)
@@ -292,7 +296,6 @@ public class CommandHandler : MonoBehaviour
             }
             else if (result.ToUpper() == "TOGGLE")
             {
-                // TODO: Handle TOGGLE command (reserved for future use)
                 DebugViewController.AddDebugMessage("TOGGLE command received (not yet implemented)");
                 Debug.Log("CommandHandler: TOGGLE functionality not yet implemented");
             }
@@ -305,6 +308,63 @@ public class CommandHandler : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"CommandHandler: Error in HandleSetCommand: {ex.Message}");
+        }
+    }
+
+    // ===== NEW: S3 UPLOAD HANDLERS =====
+
+    private void HandleS3UploadResponse(JObject messageObj)
+    {
+        try
+        {
+            string presignedUrl = messageObj["data"]?.ToString();
+
+            if (string.IsNullOrEmpty(presignedUrl))
+            {
+                Debug.LogWarning("CommandHandler: S3_UPLOAD_RESPONSE has empty data field");
+                return;
+            }
+
+            // Route to ScreenshotUploadManager
+            if (ScreenshotUploadManager.Instance != null)
+            {
+                ScreenshotUploadManager.Instance.OnUploadResponseReceived(presignedUrl);
+            }
+            else
+            {
+                Debug.LogError("CommandHandler: ScreenshotUploadManager.Instance is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleS3UploadResponse: {ex.Message}");
+        }
+    }
+
+    private void HandleS3Error(JObject messageObj)
+    {
+        try
+        {
+            string errorMessage = messageObj["data"]?.ToString();
+
+            if (string.IsNullOrEmpty(errorMessage))
+            {
+                errorMessage = "Unknown S3 error";
+            }
+
+            // Route to ScreenshotUploadManager
+            if (ScreenshotUploadManager.Instance != null)
+            {
+                ScreenshotUploadManager.Instance.OnUploadErrorReceived(errorMessage);
+            }
+            else
+            {
+                Debug.LogError("CommandHandler: ScreenshotUploadManager.Instance is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleS3Error: {ex.Message}");
         }
     }
 }
