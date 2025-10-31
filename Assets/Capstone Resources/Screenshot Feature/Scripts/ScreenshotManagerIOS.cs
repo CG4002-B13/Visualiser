@@ -16,7 +16,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
     [Header("Screenshot Settings")]
     [SerializeField] private int screenshotScale = 2;
     [SerializeField] private bool hideButtonDuringCapture = true;
-    [SerializeField] private int maxSessionScreenshots = 12; // Maximum screenshots stored in session
+    [SerializeField][Range(0, 100)] private int jpgQuality = 85;
 
     [Header("Visual Feedback")]
     [SerializeField] private Image flashPanel;
@@ -26,7 +26,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
     [SerializeField] private AudioClip shutterSoundClip;
     private AudioSource audioSource;
 
-    // Session storage for gallery feature
+    // Session storage for gallery feature (DEPRECATED - kept for compatibility)
     private List<SessionScreenshotData> sessionScreenshots = new List<SessionScreenshotData>();
 
     private bool isCapturing = false;
@@ -73,14 +73,6 @@ public class ScreenshotManagerIOS : MonoBehaviour
     {
         if (!isCapturing)
         {
-            // Check if we've reached the session limit
-            if (sessionScreenshots.Count >= maxSessionScreenshots)
-            {
-                DebugViewController.AddDebugMessage($"Screenshot limit reached ({maxSessionScreenshots}). Delete some screenshots first.");
-                Debug.LogWarning($"Cannot take more screenshots. Session limit: {maxSessionScreenshots}");
-                return;
-            }
-
             StartCoroutine(CaptureScreenshotCoroutine());
         }
     }
@@ -88,6 +80,19 @@ public class ScreenshotManagerIOS : MonoBehaviour
     private IEnumerator CaptureScreenshotCoroutine()
     {
         isCapturing = true;
+
+        // Get username from Settings
+        string username = SettingsMenuController.Instance != null
+            ? SettingsMenuController.Instance.GetUsername()
+            : "default";
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            username = "default";
+            DebugViewController.AddDebugMessage("WARNING: No username set, using 'default'");
+        }
+
+        username = username.Trim();
 
         // Hide UI elements we don't want in screenshot
         bool wasButtonActive = false;
@@ -97,29 +102,46 @@ public class ScreenshotManagerIOS : MonoBehaviour
             screenshotButton.gameObject.SetActive(false);
         }
 
-        // Wait for end of frame - OUTSIDE try-catch
+        // Wait for end of frame
         yield return new WaitForEndOfFrame();
 
-        // Generate filename and path
-        string filename = $"Screenshot_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.png";
-        string filePath = Path.Combine(Application.persistentDataPath, filename);
+        // Generate epoch timestamp
+        long epochTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // Build folder structure: screenshots/{username}/
+        string screenshotsFolder = Path.Combine(Application.persistentDataPath, "screenshots");
+        string userFolder = Path.Combine(screenshotsFolder, username);
+
+        // Create folders if they don't exist
+        if (!Directory.Exists(userFolder))
+        {
+            Directory.CreateDirectory(userFolder);
+            Debug.Log($"Created user folder: {userFolder}");
+        }
+
+        // Generate filename: {username}/{epoch}.jpg
+        string filename = $"{epochTimestamp}.jpg";
+        string filePath = Path.Combine(userFolder, filename);
 
         bool captureSuccess = false;
         Texture2D screenshot = null;
 
-        // Capture screenshot - try-catch without yield
+        // Capture screenshot
         try
         {
             screenshot = CaptureScreenshotAsTexture();
 
             if (screenshot != null)
             {
-                // Save to file
-                byte[] bytes = screenshot.EncodeToPNG();
+                // Encode as JPG
+                byte[] bytes = screenshot.EncodeToJPG(jpgQuality);
                 File.WriteAllBytes(filePath, bytes);
 
                 Debug.Log($"Screenshot saved to: {filePath}");
-                DebugViewController.AddDebugMessage($"Screenshot captured: {filename}");
+                DebugViewController.AddDebugMessage($"=== Screenshot Captured ===");
+                DebugViewController.AddDebugMessage($"Filename: {username}/{filename}");
+                DebugViewController.AddDebugMessage($"Size: {bytes.Length / 1024}KB");
+                DebugViewController.AddDebugMessage($"Quality: {jpgQuality}");
 
                 // Play shutter sound
                 if (audioSource != null && shutterSoundClip != null)
@@ -130,25 +152,20 @@ public class ScreenshotManagerIOS : MonoBehaviour
                 // Show flash effect
                 StartCoroutine(FlashEffect());
 
-                // NEW: Store in session memory for gallery
-                SessionScreenshotData sessionData = new SessionScreenshotData(
-                    screenshot,
-                    filePath,
-                    DateTime.Now
-                );
-                sessionScreenshots.Add(sessionData);
-
-                // NEW: Notify GalleryViewController
-                if (GalleryViewController.Instance != null)
-                {
-                    GalleryViewController.Instance.OnScreenshotCaptured(sessionData);
-                }
-
-                DebugViewController.AddDebugMessage($"Session screenshots: {sessionScreenshots.Count}/{maxSessionScreenshots}");
+                // Destroy screenshot texture (we'll load from disk when needed)
+                Destroy(screenshot);
 
                 captureSuccess = true;
 
-                // NOTE: We do NOT destroy the texture anymore - it's kept in sessionScreenshots for gallery use
+                // Initiate S3 upload
+                if (ScreenshotUploadManager.Instance != null)
+                {
+                    ScreenshotUploadManager.Instance.UploadScreenshot(filePath, epochTimestamp);
+                }
+                else
+                {
+                    DebugViewController.AddDebugMessage("WARNING: ScreenshotUploadManager not found");
+                }
             }
         }
         catch (Exception e)
@@ -162,17 +179,6 @@ public class ScreenshotManagerIOS : MonoBehaviour
             {
                 Destroy(screenshot);
             }
-        }
-
-        // Wait for file to be written - OUTSIDE try-catch
-        if (captureSuccess)
-        {
-            yield return new WaitForSeconds(0.1f);
-
-            // Save to iOS Photos
-#if UNITY_IOS
-            SaveToIOSGallery(filePath);
-#endif
         }
 
         // Restore button
@@ -227,83 +233,93 @@ public class ScreenshotManagerIOS : MonoBehaviour
         flashPanel.gameObject.SetActive(false);
     }
 
-    private void SaveToIOSGallery(string filePath)
-    {
-#if UNITY_IOS
-        if (File.Exists(filePath))
-        {
-            try
-            {
-                _SaveImageToGallery(filePath);
-                Debug.Log("Screenshot saved to iOS Photos!");
-                DebugViewController.AddDebugMessage("Saved to iOS Photos");
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Failed to save to gallery: {e.Message}");
-                DebugViewController.AddDebugMessage($"iOS Photos save failed: {e.Message}");
-            }
-        }
-#endif
-    }
-
-    /// <summary>
-    /// Get the list of screenshots captured in the current session (for GalleryViewController)
-    /// </summary>
+    // DEPRECATED: Kept for compatibility - SessionScreenshotData no longer used
     public List<SessionScreenshotData> GetSessionScreenshots()
     {
         return sessionScreenshots;
     }
 
-    /// <summary>
-    /// Remove a screenshot from the session list and delete the file from disk
-    /// Called by GalleryViewController when user deletes a screenshot
-    /// </summary>
     public void RemoveScreenshotFromSession(SessionScreenshotData data)
     {
-        if (data == null) return;
-
-        // Remove from session list
-        sessionScreenshots.Remove(data);
-
-        // Destroy the texture to free memory
-        if (data.texture != null)
-        {
-            Destroy(data.texture);
-        }
-
-        // Delete the PNG file from disk
-        if (File.Exists(data.filePath))
-        {
-            try
-            {
-                File.Delete(data.filePath);
-                Debug.Log($"Deleted screenshot file: {data.fileName}");
-                DebugViewController.AddDebugMessage($"Deleted: {data.fileName}");
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Failed to delete file: {e.Message}");
-                DebugViewController.AddDebugMessage($"Delete failed: {e.Message}");
-            }
-        }
-
-        DebugViewController.AddDebugMessage($"Session screenshots: {sessionScreenshots.Count}/{maxSessionScreenshots}");
+        // This method is deprecated - gallery now uses disk-based loading
+        Debug.LogWarning("RemoveScreenshotFromSession is deprecated");
     }
 
-    /// <summary>
-    /// Get the current count of session screenshots
-    /// </summary>
     public int GetSessionScreenshotCount()
     {
         return sessionScreenshots.Count;
     }
 
-    /// <summary>
-    /// Get the maximum allowed session screenshots
-    /// </summary>
     public int GetMaxSessionScreenshots()
     {
-        return maxSessionScreenshots;
+        return 0; // No longer applicable
     }
+
+    /// <summary>
+    /// Get screenshots folder path for specific username
+    /// </summary>
+    public string GetUserScreenshotsFolder(string username)
+    {
+        string screenshotsFolder = Path.Combine(Application.persistentDataPath, "screenshots");
+        return Path.Combine(screenshotsFolder, username);
+    }
+
+    /// <summary>
+    /// Get all screenshot file paths for specific username
+    /// </summary>
+    public string[] GetUserScreenshotFiles(string username)
+    {
+        string userFolder = GetUserScreenshotsFolder(username);
+
+        if (!Directory.Exists(userFolder))
+        {
+            return new string[0];
+        }
+
+        return Directory.GetFiles(userFolder, "*.jpg", SearchOption.TopDirectoryOnly);
+    }
+
+    /// <summary>
+    /// Delete screenshot file from disk
+    /// </summary>
+    public bool DeleteScreenshot(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                File.Delete(filePath);
+                DebugViewController.AddDebugMessage($"Deleted: {Path.GetFileName(filePath)}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                DebugViewController.AddDebugMessage($"Delete failed: {e.Message}");
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+#if UNITY_IOS
+    /// <summary>
+    /// Save screenshot to iOS Photos (called manually from FSIO button)
+    /// </summary>
+    public void SaveToIOSPhotos(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            try
+            {
+                _SaveImageToGallery(filePath);
+                DebugViewController.AddDebugMessage("Saved to iOS Photos");
+            }
+            catch (Exception e)
+            {
+                DebugViewController.AddDebugMessage($"iOS Photos save failed: {e.Message}");
+            }
+        }
+    }
+#endif
 }
