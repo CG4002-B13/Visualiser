@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,21 +11,26 @@ public class GalleryViewController : MonoBehaviour
     public static GalleryViewController Instance { get; private set; }
 
     [Header("Prefab References")]
-    [SerializeField] private GameObject thumbnailPrefab; // GalleryImageButtonPrefab
+    [SerializeField] private GameObject thumbnailPrefab;
 
     [Header("Gallery Grid")]
-    [SerializeField] private Transform gridContent; // Content GameObject (child of ScrollView)
+    [SerializeField] private Transform gridContent;
 
     [Header("Full-Screen Overlay")]
-    [SerializeField] private GameObject fullScreenOverlay; // FullScreenImageOverlay
-    [SerializeField] private RawImage fullScreenRawImage; // FullScreenRawImage (inside ImageContainer)
-    [SerializeField] private Button backgroundDimmer; // BackgroundDimmer (to close on tap)
-    [SerializeField] private Button closeFSIOButton; // CloseFSIOButton (explicit close)
-    [SerializeField] private Button deleteFSIOButton; // DeleteFSIOButton (delete screenshot)
-    [SerializeField] private TextMeshProUGUI timestampText; // TimeStampSIOText (display timestamp)
+    [SerializeField] private GameObject fullScreenOverlay;
+    [SerializeField] private RawImage fullScreenRawImage;
+    [SerializeField] private Button backgroundDimmer;
+    [SerializeField] private Button closeFSIOButton;
+    [SerializeField] private Button deleteFSIOButton;
+    [SerializeField] private TextMeshProUGUI timestampText;
 
-    // Currently displayed screenshot in full-screen view
-    private SessionScreenshotData currentDisplayedScreenshot;
+    // Currently displayed screenshot data
+    private string currentDisplayedFilePath;
+    private Texture2D currentDisplayedTexture;
+    private DateTime currentDisplayedTimestamp;
+
+    // Thumbnail cache (loaded textures for gallery grid)
+    private List<Texture2D> thumbnailTextures = new List<Texture2D>();
 
     private void Awake()
     {
@@ -40,7 +47,6 @@ public class GalleryViewController : MonoBehaviour
 
     private void Start()
     {
-        // Setup full-screen overlay button listeners
         if (closeFSIOButton != null)
         {
             closeFSIOButton.onClick.AddListener(HideFullScreenImage);
@@ -56,127 +62,172 @@ public class GalleryViewController : MonoBehaviour
             deleteFSIOButton.onClick.AddListener(DeleteCurrentScreenshot);
         }
 
-        // Ensure overlay is hidden on start
         if (fullScreenOverlay != null)
         {
             fullScreenOverlay.SetActive(false);
         }
 
-        Debug.Log("GalleryViewController initialized");
+        Debug.Log("GalleryViewController initialized (disk-based mode)");
     }
 
-    /// <summary>
-    /// Called when the Gallery Tab is opened via SettingsPanelController
-    /// </summary>
     public void OnTabOpened()
     {
         RefreshGallery();
-
-        // Log to Debug panel for sanity check
-        int screenshotCount = ScreenshotManagerIOS.Instance != null
-            ? ScreenshotManagerIOS.Instance.GetSessionScreenshotCount()
-            : 0;
-
-        DebugViewController.AddDebugMessage($"Gallery opened: {screenshotCount} screenshot(s) available");
-        Debug.Log($"Gallery Tab Opened - {screenshotCount} screenshots in session");
     }
 
     /// <summary>
-    /// Refresh the gallery grid by rebuilding all thumbnails from session screenshots
+    /// Refresh gallery by loading screenshots from disk
     /// </summary>
     public void RefreshGallery()
     {
-        // Clear existing thumbnails
+        // Clear existing thumbnails and textures
         ClearGalleryGrid();
+        UnloadThumbnailTextures();
 
-        // Get session screenshots from ScreenshotManagerIOS
+        // Get current username
+        string username = SettingsMenuController.Instance != null
+            ? SettingsMenuController.Instance.GetUsername()
+            : "default";
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            username = "default";
+        }
+
+        username = username.Trim();
+
+        DebugViewController.AddDebugMessage($"=== Gallery Opened ===");
+        DebugViewController.AddDebugMessage($"Loading screenshots for: {username}");
+
+        // Get screenshot files from disk
         if (ScreenshotManagerIOS.Instance == null)
         {
             Debug.LogWarning("GalleryViewController: ScreenshotManagerIOS.Instance is null!");
             return;
         }
 
-        List<SessionScreenshotData> screenshots = ScreenshotManagerIOS.Instance.GetSessionScreenshots();
+        string[] screenshotFiles = ScreenshotManagerIOS.Instance.GetUserScreenshotFiles(username);
 
-        if (screenshots == null || screenshots.Count == 0)
+        if (screenshotFiles == null || screenshotFiles.Length == 0)
         {
-            Debug.Log("No screenshots in session to display");
+            DebugViewController.AddDebugMessage("No screenshots found for this user");
+            Debug.Log($"No screenshots found for user: {username}");
             return;
         }
 
+        // Sort by filename (epoch timestamp) - newest first
+        Array.Sort(screenshotFiles);
+        Array.Reverse(screenshotFiles);
+
+        DebugViewController.AddDebugMessage($"Found {screenshotFiles.Length} screenshot(s)");
+
         // Create thumbnails for each screenshot
-        foreach (SessionScreenshotData data in screenshots)
+        foreach (string filePath in screenshotFiles)
         {
-            CreateThumbnail(data);
+            CreateThumbnailFromFile(filePath);
         }
 
-        Debug.Log($"Gallery refreshed with {screenshots.Count} screenshot(s)");
+        Debug.Log($"Gallery refreshed with {screenshotFiles.Length} screenshot(s)");
     }
 
     /// <summary>
-    /// Called by ScreenshotManagerIOS when a new screenshot is captured
+    /// DEPRECATED: Kept for compatibility
     /// </summary>
     public void OnScreenshotCaptured(SessionScreenshotData data)
     {
-        // Only create thumbnail if gallery tab is currently active
-        // This avoids instantiation issues when gallery is not visible
-        if (gameObject.activeInHierarchy)
-        {
-            CreateThumbnail(data);
-            Debug.Log($"New thumbnail added to gallery: {data.fileName}");
-        }
+        // No longer used - gallery refreshes from disk when opened
+        Debug.Log("OnScreenshotCaptured called (deprecated - using disk-based loading)");
     }
 
     /// <summary>
-    /// Create and instantiate a thumbnail button for a screenshot
+    /// Create thumbnail from file on disk
     /// </summary>
-    private void CreateThumbnail(SessionScreenshotData data)
+    private void CreateThumbnailFromFile(string filePath)
     {
         if (thumbnailPrefab == null || gridContent == null)
         {
-            Debug.LogError("GalleryViewController: thumbnailPrefab or gridContent is not assigned!");
+            Debug.LogError("GalleryViewController: thumbnailPrefab or gridContent not assigned!");
             return;
         }
 
-        // Instantiate thumbnail prefab as child of grid content
+        if (!File.Exists(filePath))
+        {
+            Debug.LogWarning($"File not found: {filePath}");
+            return;
+        }
+
+        // Load texture from file
+        Texture2D texture = LoadTextureFromFile(filePath);
+        if (texture == null)
+        {
+            Debug.LogWarning($"Failed to load texture: {filePath}");
+            return;
+        }
+
+        // Store texture reference for cleanup
+        thumbnailTextures.Add(texture);
+
+        // Instantiate thumbnail prefab
         GameObject thumbnailObj = Instantiate(thumbnailPrefab, gridContent);
 
-        // Store reference to thumbnail object in session data
-        data.thumbnailObject = thumbnailObj;
-
-        // Get the RawImage component from the thumbnail
+        // Get RawImage component and assign texture
         RawImage thumbnailImage = thumbnailObj.GetComponentInChildren<RawImage>();
-        if (thumbnailImage != null && data.texture != null)
+        if (thumbnailImage != null)
         {
-            // Assign the screenshot texture
-            thumbnailImage.texture = data.texture;
+            thumbnailImage.texture = texture;
         }
         else
         {
-            Debug.LogError("GalleryViewController: RawImage component not found in thumbnail prefab or texture is null!");
+            Debug.LogError("GalleryViewController: RawImage not found in thumbnail prefab!");
         }
 
-        // Get the Button component and add click listener
+        // Get Button component and add click listener
         Button button = thumbnailObj.GetComponent<Button>();
         if (button != null)
         {
-            // Use lambda to capture the specific screenshot data for this button
-            button.onClick.AddListener(() => ShowFullScreenImage(data));
+            // Capture filePath in closure
+            string capturedPath = filePath;
+            button.onClick.AddListener(() => ShowFullScreenImage(capturedPath));
         }
         else
         {
-            Debug.LogError("GalleryViewController: Button component not found in thumbnail prefab!");
+            Debug.LogError("GalleryViewController: Button not found in thumbnail prefab!");
         }
     }
 
     /// <summary>
-    /// Clear all thumbnails from the gallery grid
+    /// Load texture from JPG file
+    /// </summary>
+    private Texture2D LoadTextureFromFile(string filePath)
+    {
+        try
+        {
+            byte[] fileData = File.ReadAllBytes(filePath);
+            Texture2D texture = new Texture2D(2, 2);
+            if (texture.LoadImage(fileData))
+            {
+                return texture;
+            }
+            else
+            {
+                Destroy(texture);
+                return null;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Failed to load texture: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Clear all thumbnails from grid
     /// </summary>
     private void ClearGalleryGrid()
     {
         if (gridContent == null) return;
 
-        // Destroy all children of the grid content
         foreach (Transform child in gridContent)
         {
             Destroy(child.gameObject);
@@ -184,36 +235,72 @@ public class GalleryViewController : MonoBehaviour
     }
 
     /// <summary>
-    /// Show the full-screen overlay with the selected screenshot
+    /// Unload all thumbnail textures to free memory
     /// </summary>
-    private void ShowFullScreenImage(SessionScreenshotData data)
+    private void UnloadThumbnailTextures()
     {
-        if (fullScreenOverlay == null || fullScreenRawImage == null)
+        foreach (Texture2D texture in thumbnailTextures)
         {
-            Debug.LogError("GalleryViewController: Full-screen overlay components not assigned!");
-            return;
+            if (texture != null)
+            {
+                Destroy(texture);
+            }
         }
 
-        // Store reference to currently displayed screenshot
-        currentDisplayedScreenshot = data;
-
-        // Assign texture to full-screen RawImage
-        fullScreenRawImage.texture = data.texture;
-
-        // Update timestamp text if available
-        if (timestampText != null)
-        {
-            timestampText.text = data.timestamp.ToString("MMM dd, yyyy\nhh:mm tt");
-        }
-
-        // Show the overlay
-        fullScreenOverlay.SetActive(true);
-
-        Debug.Log($"Showing full-screen image: {data.fileName}");
+        thumbnailTextures.Clear();
     }
 
     /// <summary>
-    /// Hide the full-screen overlay and return to gallery grid
+    /// Show full-screen image overlay
+    /// </summary>
+    private void ShowFullScreenImage(string filePath)
+    {
+        if (fullScreenOverlay == null || fullScreenRawImage == null)
+        {
+            Debug.LogError("GalleryViewController: Full-screen components not assigned!");
+            return;
+        }
+
+        // Load full-resolution texture
+        Texture2D texture = LoadTextureFromFile(filePath);
+        if (texture == null)
+        {
+            DebugViewController.AddDebugMessage($"Failed to load image: {Path.GetFileName(filePath)}");
+            return;
+        }
+
+        // Store current display info
+        currentDisplayedFilePath = filePath;
+        currentDisplayedTexture = texture;
+
+        // Parse timestamp from filename (epoch)
+        string filename = Path.GetFileNameWithoutExtension(filePath);
+        if (long.TryParse(filename, out long epoch))
+        {
+            currentDisplayedTimestamp = DateTimeOffset.FromUnixTimeMilliseconds(epoch).DateTime.ToLocalTime();
+        }
+        else
+        {
+            currentDisplayedTimestamp = File.GetCreationTime(filePath);
+        }
+
+        // Assign texture to full-screen image
+        fullScreenRawImage.texture = texture;
+
+        // Update timestamp text
+        if (timestampText != null)
+        {
+            timestampText.text = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
+        }
+
+        // Show overlay
+        fullScreenOverlay.SetActive(true);
+
+        Debug.Log($"Showing full-screen: {Path.GetFileName(filePath)}");
+    }
+
+    /// <summary>
+    /// Hide full-screen overlay
     /// </summary>
     private void HideFullScreenImage()
     {
@@ -222,51 +309,73 @@ public class GalleryViewController : MonoBehaviour
             fullScreenOverlay.SetActive(false);
         }
 
-        // Clear the texture reference
+        // Clear texture reference
         if (fullScreenRawImage != null)
         {
             fullScreenRawImage.texture = null;
         }
 
-        // Clear current screenshot reference
-        currentDisplayedScreenshot = null;
+        // Unload full-resolution texture to free memory
+        if (currentDisplayedTexture != null)
+        {
+            Destroy(currentDisplayedTexture);
+            currentDisplayedTexture = null;
+        }
+
+        currentDisplayedFilePath = null;
 
         Debug.Log("Full-screen image closed");
     }
 
     /// <summary>
-    /// Delete the currently displayed screenshot from session and disk
+    /// Delete currently displayed screenshot
     /// </summary>
     private void DeleteCurrentScreenshot()
     {
-        if (currentDisplayedScreenshot == null)
+        if (string.IsNullOrEmpty(currentDisplayedFilePath))
         {
-            Debug.LogWarning("GalleryViewController: No screenshot is currently displayed to delete");
+            Debug.LogWarning("GalleryViewController: No screenshot currently displayed");
             return;
         }
 
-        Debug.Log($"Deleting screenshot: {currentDisplayedScreenshot.fileName}");
+        string filename = Path.GetFileName(currentDisplayedFilePath);
+        DebugViewController.AddDebugMessage($"=== Deleting Screenshot ===");
+        DebugViewController.AddDebugMessage($"File: {filename}");
 
-        // Destroy the thumbnail GameObject from the grid
-        if (currentDisplayedScreenshot.thumbnailObject != null)
-        {
-            Destroy(currentDisplayedScreenshot.thumbnailObject);
-        }
-
-        // Remove from ScreenshotManagerIOS (this also deletes the file and texture)
+        // Delete from disk
+        bool deleteSuccess = false;
         if (ScreenshotManagerIOS.Instance != null)
         {
-            ScreenshotManagerIOS.Instance.RemoveScreenshotFromSession(currentDisplayedScreenshot);
+            deleteSuccess = ScreenshotManagerIOS.Instance.DeleteScreenshot(currentDisplayedFilePath);
         }
 
-        // Close the full-screen overlay
-        HideFullScreenImage();
+        if (deleteSuccess)
+        {
+            DebugViewController.AddDebugMessage("Local file deleted");
 
-        // Log to Debug panel
-        int remainingCount = ScreenshotManagerIOS.Instance != null
-            ? ScreenshotManagerIOS.Instance.GetSessionScreenshotCount()
-            : 0;
+            // TODO: Delete from S3 (Phase 2 - Delete implementation)
+            DebugViewController.AddDebugMessage("Cloud deletion not yet implemented");
 
-        DebugViewController.AddDebugMessage($"Screenshot deleted. Remaining: {remainingCount}");
+            // Close full-screen overlay
+            HideFullScreenImage();
+
+            // Refresh gallery to show updated list
+            RefreshGallery();
+        }
+        else
+        {
+            DebugViewController.AddDebugMessage("Failed to delete local file");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // Cleanup textures when controller is destroyed
+        UnloadThumbnailTextures();
+
+        if (currentDisplayedTexture != null)
+        {
+            Destroy(currentDisplayedTexture);
+        }
     }
 }
