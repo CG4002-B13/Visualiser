@@ -230,10 +230,18 @@ public class CommandHandler : MonoBehaviour
     {
         try
         {
-            DebugViewController.AddDebugMessage("Screenshot command received");
+            DebugViewController.AddDebugMessage("=== COMMAND_SCREENSHOT Received ===");
 
-            // TODO: Implement screenshot functionality
-            Debug.Log("CommandHandler: Screenshot functionality not yet implemented");
+            // Trigger screenshot capture via ScreenshotManagerIOS
+            if (ScreenshotManagerIOS.Instance != null)
+            {
+                ScreenshotManagerIOS.Instance.CaptureScreenshot();
+                DebugViewController.AddDebugMessage("===Screenshot command executed===");
+            }
+            else
+            {
+                DebugViewController.AddDebugMessage("ERROR: ScreenshotManagerIOS not found");
+            }
         }
         catch (Exception ex)
         {
