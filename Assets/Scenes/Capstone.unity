@@ -122,6 +122,52 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &30287242
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 30287244}
+  - component: {fileID: 30287243}
+  m_Layer: 0
+  m_Name: ScreenshotSyncManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &30287243
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 30287242}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c2fd7c4f36834550a9dcd161cee25cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  downloadTimeout: 30
+  uploadTimeout: 30
+--- !u!4 &30287244
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 30287242}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1109.2158, y: 400.80716, z: -17.551886}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &76954658 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1947273965378096590, guid: dfe37f714f98d454f839468a402528f1, type: 3}
@@ -367,7 +413,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Connected to AWS Cloud: Yes'
+  m_text: 'Connected to Server: Yes'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -1120,7 +1166,7 @@ GameObject:
   - component: {fileID: 1726236868}
   - component: {fileID: 1726236867}
   m_Layer: 5
-  m_Name: Sync Button
+  m_Name: SyncButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1411,6 +1457,10 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 714024661061152939, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1125982406991155093, guid: 804ad68d0fa304266a912244fea16842, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -1459,6 +1509,22 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 2476073527641965092, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: syncButton
+      value: 
+      objectReference: {fileID: 1726236867}
+    - target: {fileID: 2476073527641965092, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: syncButtonText
+      value: 
+      objectReference: {fileID: 1275551972}
+    - target: {fileID: 2476073527641965092, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: syncRequiredText
+      value: 
+      objectReference: {fileID: 1517263518}
+    - target: {fileID: 2476073527641965092, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: connectionStatusText
+      value: 
+      objectReference: {fileID: 667805936}
     - target: {fileID: 2476073527641965092, guid: 804ad68d0fa304266a912244fea16842, type: 3}
       propertyPath: deleteFSIOButtonText
       value: 
@@ -1798,6 +1864,10 @@ PrefabInstance:
     - target: {fileID: 4982767978992932522, guid: 804ad68d0fa304266a912244fea16842, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 5017535041031721589, guid: 804ad68d0fa304266a912244fea16842, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5097306526354140177, guid: 804ad68d0fa304266a912244fea16842, type: 3}
       propertyPath: m_AnchorMax.y
@@ -2688,3 +2758,4 @@ SceneRoots:
   - {fileID: 4464250376283617708}
   - {fileID: 770081956}
   - {fileID: 952597916}
+  - {fileID: 30287244}
