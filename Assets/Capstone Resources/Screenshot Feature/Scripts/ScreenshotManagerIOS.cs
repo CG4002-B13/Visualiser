@@ -81,7 +81,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
     {
         isCapturing = true;
 
-        // Get username from Settings
+        // Get username from Settings (convert to lowercase)
         string username = SettingsMenuController.Instance != null
             ? SettingsMenuController.Instance.GetUsername()
             : "default";
@@ -92,7 +92,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
             DebugViewController.AddDebugMessage("WARNING: No username set, using 'default'");
         }
 
-        username = username.Trim();
+        username = username.Trim().ToLower();  // Convert to lowercase
 
         // Hide UI elements we don't want in screenshot
         bool wasButtonActive = false;
@@ -119,7 +119,7 @@ public class ScreenshotManagerIOS : MonoBehaviour
             Debug.Log($"Created user folder: {userFolder}");
         }
 
-        // Generate filename: {username}/{epoch}.jpg
+        // Generate filename: {epoch}.jpg
         string filename = $"{epochTimestamp}.jpg";
         string filePath = Path.Combine(userFolder, filename);
 
@@ -256,20 +256,20 @@ public class ScreenshotManagerIOS : MonoBehaviour
     }
 
     /// <summary>
-    /// Get screenshots folder path for specific username
+    /// Get screenshots folder path for specific username (lowercase)
     /// </summary>
     public string GetUserScreenshotsFolder(string username)
     {
         string screenshotsFolder = Path.Combine(Application.persistentDataPath, "screenshots");
-        return Path.Combine(screenshotsFolder, username);
+        return Path.Combine(screenshotsFolder, username.ToLower());
     }
 
     /// <summary>
-    /// Get all screenshot file paths for specific username
+    /// Get all screenshot file paths for specific username (lowercase)
     /// </summary>
     public string[] GetUserScreenshotFiles(string username)
     {
-        string userFolder = GetUserScreenshotsFolder(username);
+        string userFolder = GetUserScreenshotsFolder(username.ToLower());
 
         if (!Directory.Exists(userFolder))
         {
