@@ -21,6 +21,8 @@ public class ScreenshotUploadManager : MonoBehaviour
     private long pendingTimestamp = 0;
     private int currentAttempt = 0;
 
+    public bool IsUploadPending => isUploading;
+
     private void Awake()
     {
         if (Instance == null)
@@ -36,6 +38,7 @@ public class ScreenshotUploadManager : MonoBehaviour
     /// <summary>
     /// Initiate upload process for a screenshot
     /// Called by ScreenshotManagerIOS after capture
+    /// epochTimestamp is the SCREENSHOT timestamp - use this consistently
     /// </summary>
     public void UploadScreenshot(string filePath, long epochTimestamp)
     {
@@ -55,17 +58,18 @@ public class ScreenshotUploadManager : MonoBehaviour
 
         // Store pending upload info
         pendingFilePath = filePath;
-        pendingTimestamp = epochTimestamp;
+        pendingTimestamp = epochTimestamp;  // ← SCREENSHOT timestamp
         currentAttempt = 0;
 
         // Request presigned URL from server via WebSocket
-        RequestPresignedURL(epochTimestamp);
+        RequestPresignedURL(epochTimestamp);  // ← Pass screenshot timestamp
     }
 
     /// <summary>
     /// Send S3_UPLOAD_REQUEST via WebSocket to get presigned URL
+    /// Uses the screenshot's epoch timestamp for consistency with local filename
     /// </summary>
-    private void RequestPresignedURL(long epochTimestamp)
+    private void RequestPresignedURL(long screenshotEpochTimestamp)
     {
         if (WS_Client.Instance == null)
         {
@@ -80,33 +84,45 @@ public class ScreenshotUploadManager : MonoBehaviour
             return;
         }
 
-        // Get username from Settings
-        string username = SettingsMenuController.Instance != null
-            ? SettingsMenuController.Instance.GetUsername()
-            : "unknown";
-
-        if (string.IsNullOrWhiteSpace(username))
+        // Get connection UserId from WS_Client (username-connectionTimestamp)
+        string userId = WS_Client.Instance.GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
         {
-            DebugViewController.AddDebugMessage("ERROR: Username not set, cannot upload");
+            DebugViewController.AddDebugMessage("ERROR: UserId not available from WS_Client");
             return;
         }
 
-        username = username.Trim();
+        // Get SessionId (just username)
+        string sessionId = WS_Client.Instance.GetCurrentSessionId();
+        if (string.IsNullOrEmpty(sessionId))
+        {
+            DebugViewController.AddDebugMessage("ERROR: SessionId not available from WS_Client");
+            return;
+        }
+
+        // ===== FIXED: Use screenshot timestamp for Timestamp field =====
+        // This ensures:
+        // - Local file: username/screenshotEpochTimestamp.jpg
+        // - S3 file: username/screenshotEpochTimestamp.jpg (MATCHES!)
+        // - Delete request: Delete username/screenshotEpochTimestamp.jpg (WORKS!)
+        long timestampForRequest = screenshotEpochTimestamp;
 
         // Build request message
         JObject request = new JObject
         {
             ["EventType"] = "S3_UPLOAD_REQUEST",
-            ["UserId"] = $"{username}-{epochTimestamp}",
-            ["SessionId"] = username,
-            ["Timestamp"] = epochTimestamp,
+            ["UserId"] = userId,                    // From connection (e.g., "parth-1761884142983")
+            ["SessionId"] = sessionId,              // From connection (e.g., "parth")
+            ["Timestamp"] = timestampForRequest,   // ← SCREENSHOT timestamp (consistent!)
             ["Data"] = null
         };
 
         string jsonRequest = request.ToString(Newtonsoft.Json.Formatting.None);
 
         DebugViewController.AddDebugMessage("=== S3 Upload Request ===");
-        DebugViewController.AddDebugMessage($"Requesting presigned URL for: {username}/{epochTimestamp}.jpg");
+        DebugViewController.AddDebugMessage($"Requesting presigned URL for: {sessionId}/{screenshotEpochTimestamp}.jpg");
+        DebugViewController.AddDebugMessage($"UserId: {userId}");
+        DebugViewController.AddDebugMessage($"Timestamp: {timestampForRequest}");
 
         WS_Client.Instance.SendMessage(jsonRequest);
     }
@@ -218,8 +234,8 @@ public class ScreenshotUploadManager : MonoBehaviour
             if (currentAttempt < maxRetryAttempts)
             {
                 DebugViewController.AddDebugMessage($"Retrying upload... ({currentAttempt + 1}/{maxRetryAttempts})");
-                yield return new WaitForSeconds(1f); // Wait 1 second before retry
-                StartCoroutine(UploadToS3(presignedUrl, filePath)); // Retry with same URL
+                yield return new WaitForSeconds(1f);
+                StartCoroutine(UploadToS3(presignedUrl, filePath));
             }
             else
             {
