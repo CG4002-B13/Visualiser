@@ -101,8 +101,8 @@ public class WS_Client : MonoBehaviour
             return;
         }
 
-        // Trim whitespace
-        username = username.Trim();
+        // Trim whitespace and convert to lowercase
+        username = username.Trim().ToLower();
 
         try
         {
@@ -310,7 +310,39 @@ public class WS_Client : MonoBehaviour
         }
     }
 
-    // Public getter for debugging
+    // Public getters
     public string GetCurrentUserId() => currentUserId;
     public string GetCurrentSessionId() => currentSessionId;
+
+    /// <summary>
+    /// Get the connection timestamp from currentUserId
+    /// Used for S3 operations that need the connection epoch time
+    /// </summary>
+    public long GetConnectionTimestamp()
+    {
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            Debug.LogWarning("WS_Client: currentUserId is empty");
+            return 0;
+        }
+
+        try
+        {
+            string[] parts = currentUserId.Split('-');
+            if (parts.Length > 1)
+            {
+                return long.Parse(parts[1]);
+            }
+            else
+            {
+                Debug.LogWarning($"WS_Client: Invalid currentUserId format: {currentUserId}");
+                return 0;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"WS_Client: Failed to parse timestamp from userId: {e.Message}");
+            return 0;
+        }
+    }
 }
