@@ -22,10 +22,14 @@ public class GalleryViewController : MonoBehaviour
     [SerializeField] private Button backgroundDimmer;
     [SerializeField] private Button closeFSIOButton;
     [SerializeField] private Button deleteFSIOButton;
+    [SerializeField] private Button downloadFSIOButton;
     [SerializeField] private TextMeshProUGUI timestampText;
 
     [Header("Delete Button")]
     [SerializeField] private TextMeshProUGUI deleteFSIOButtonText;
+
+    [Header("Download Button")]
+    [SerializeField] private TextMeshProUGUI downloadFSIOButtonText;
 
     [Header("Sync Status UI")]
     [SerializeField] private TextMeshProUGUI connectionStatusText;
@@ -37,6 +41,7 @@ public class GalleryViewController : MonoBehaviour
     private string currentDisplayedFilePath;
     private Texture2D currentDisplayedTexture;
     private DateTime currentDisplayedTimestamp;
+    private string currentDisplayedFilename;  // ← NEW: Store filename
 
     // Thumbnail cache (loaded textures for gallery grid)
     private List<Texture2D> thumbnailTextures = new List<Texture2D>();
@@ -76,6 +81,11 @@ public class GalleryViewController : MonoBehaviour
             deleteFSIOButton.onClick.AddListener(DeleteCurrentScreenshot);
         }
 
+        if (downloadFSIOButton != null)
+        {
+            downloadFSIOButton.onClick.AddListener(DownloadCurrentScreenshot);
+        }
+
         if (syncButton != null)
         {
             syncButton.onClick.AddListener(OnSyncButtonClicked);
@@ -91,13 +101,11 @@ public class GalleryViewController : MonoBehaviour
 
     private void OnEnable()
     {
-        // Subscribe to connection status changes (event-based, not polling)
         WS_Client.OnConnectionStatusChanged += OnConnectionStatusChanged;
     }
 
     private void OnDisable()
     {
-        // Unsubscribe to prevent memory leaks
         WS_Client.OnConnectionStatusChanged -= OnConnectionStatusChanged;
     }
 
@@ -107,35 +115,23 @@ public class GalleryViewController : MonoBehaviour
 
         RefreshGallery();
         UpdateConnectionStatus();
-
-        // ===== LIGHTWEIGHT: Defer sync check to avoid memory spike on tab open =====
-        // Use coroutine to delay sync check - gives memory time to settle after thumbnail loading
         StartCoroutine(DeferredSyncCheck());
     }
 
-    /// <summary>
-    /// Deferred sync check - waits before checking to allow memory to settle
-    /// </summary>
     private IEnumerator DeferredSyncCheck()
     {
-        // Wait 2 seconds after tab open for memory to stabilize
         yield return new WaitForSeconds(2f);
 
-        // Now safely check sync
-        if (gameObject.activeInHierarchy)  // Only if still on gallery tab
+        if (gameObject.activeInHierarchy)
         {
             CheckSyncRequired();
         }
     }
 
-    /// <summary>
-    /// Called automatically whenever connection status changes (event-based)
-    /// </summary>
     private void OnConnectionStatusChanged(bool isConnected)
     {
         UpdateConnectionStatus();
 
-        // If disconnected, disable sync button
         if (!isConnected)
         {
             SetSyncButtonState(false);
@@ -143,16 +139,11 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Refresh gallery by loading screenshots from disk
-    /// </summary>
     public void RefreshGallery()
     {
-        // Clear existing thumbnails and textures
         ClearGalleryGrid();
         UnloadThumbnailTextures();
 
-        // Get current username (lowercase)
         string username = SettingsMenuController.Instance != null
             ? SettingsMenuController.Instance.GetUsername()
             : "default";
@@ -166,7 +157,6 @@ public class GalleryViewController : MonoBehaviour
 
         DebugViewController.AddDebugMessage($"Loading screenshots for: {username}");
 
-        // Get screenshot files from disk
         if (ScreenshotManagerIOS.Instance == null)
         {
             Debug.LogWarning("GalleryViewController: ScreenshotManagerIOS.Instance is null!");
@@ -182,13 +172,11 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Sort by filename (epoch timestamp) - newest first
         Array.Sort(screenshotFiles);
         Array.Reverse(screenshotFiles);
 
         DebugViewController.AddDebugMessage($"Found {screenshotFiles.Length} screenshot(s)");
 
-        // Create thumbnails for each screenshot
         foreach (string filePath in screenshotFiles)
         {
             CreateThumbnailFromFile(filePath);
@@ -197,10 +185,6 @@ public class GalleryViewController : MonoBehaviour
         Debug.Log($"Gallery refreshed with {screenshotFiles.Length} screenshot(s)");
     }
 
-    /// <summary>
-    /// Check sync status - LIGHTWEIGHT VERSION
-    /// Only sent if connected AND enough memory available
-    /// </summary>
     private void CheckSyncRequired()
     {
         if (!WS_Client.Instance.IsConnected)
@@ -211,13 +195,11 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // ===== CRITICAL: Check available memory before syncing =====
         long memoryUsedMB = System.GC.GetTotalMemory(false) / (1024 * 1024);
-        long availableMemoryMB = 2048 - memoryUsedMB;  // iPhone limit is ~2048 MB
+        long availableMemoryMB = 2048 - memoryUsedMB;
 
         DebugViewController.AddDebugMessage($"Memory check: {memoryUsedMB}MB used, {availableMemoryMB}MB available");
 
-        // Only check sync if we have at least 200 MB free
         if (availableMemoryMB < 200)
         {
             DebugViewController.AddDebugMessage("⚠️ Insufficient memory for sync check - skipping");
@@ -233,7 +215,7 @@ public class GalleryViewController : MonoBehaviour
             ScreenshotSyncManager.Instance.CheckSyncStatus(
                 onComplete: (uploadsNeeded, downloadsNeeded) =>
                 {
-                    if (!gameObject.activeInHierarchy) return;  // Tab closed
+                    if (!gameObject.activeInHierarchy) return;
 
                     pendingUploads = uploadsNeeded;
                     pendingDownloads = downloadsNeeded;
@@ -244,9 +226,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Update sync required text based on pending uploads/downloads
-    /// </summary>
     private void UpdateSyncRequiredText()
     {
         if (pendingUploads == 0 && pendingDownloads == 0)
@@ -261,9 +240,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Called when user clicks Sync button
-    /// </summary>
     private void OnSyncButtonClicked()
     {
         if (isSyncInProgress)
@@ -297,18 +273,12 @@ public class GalleryViewController : MonoBehaviour
                     if (success)
                     {
                         DebugViewController.AddDebugMessage("✓ Sync completed successfully");
-
-                        // Refresh gallery to show downloaded files
                         RefreshGallery();
-
-                        // Re-check sync status (should be 0, 0 now)
                         CheckSyncRequired();
                     }
                     else
                     {
                         DebugViewController.AddDebugMessage("✗ Sync failed");
-
-                        // Re-enable button
                         SetSyncButtonState(true);
                         if (syncButtonText != null)
                         {
@@ -320,9 +290,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Update connection status text (called once or when connection changes)
-    /// </summary>
     private void UpdateConnectionStatus()
     {
         if (WS_Client.Instance != null && WS_Client.Instance.IsConnected)
@@ -341,9 +308,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Set sync button state (enabled/disabled)
-    /// </summary>
     private void SetSyncButtonState(bool enabled)
     {
         if (syncButton != null)
@@ -357,9 +321,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Create thumbnail from file on disk
-    /// </summary>
     private void CreateThumbnailFromFile(string filePath)
     {
         if (thumbnailPrefab == null || gridContent == null)
@@ -406,9 +367,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Load texture from JPG file
-    /// </summary>
     private Texture2D LoadTextureFromFile(string filePath)
     {
         try
@@ -432,9 +390,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Clear all thumbnails from grid
-    /// </summary>
     private void ClearGalleryGrid()
     {
         if (gridContent == null) return;
@@ -445,9 +400,6 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Unload all thumbnail textures to free memory
-    /// </summary>
     private void UnloadThumbnailTextures()
     {
         foreach (Texture2D texture in thumbnailTextures)
@@ -462,7 +414,7 @@ public class GalleryViewController : MonoBehaviour
     }
 
     /// <summary>
-    /// Show full-screen image overlay
+    /// Show full-screen image overlay with filename and timestamp
     /// </summary>
     private void ShowFullScreenImage(string filePath)
     {
@@ -481,6 +433,7 @@ public class GalleryViewController : MonoBehaviour
 
         currentDisplayedFilePath = filePath;
         currentDisplayedTexture = texture;
+        currentDisplayedFilename = Path.GetFileName(filePath);  // ← NEW: Store filename
 
         string filename = Path.GetFileNameWithoutExtension(filePath);
         if (long.TryParse(filename, out long epoch))
@@ -494,20 +447,21 @@ public class GalleryViewController : MonoBehaviour
 
         fullScreenRawImage.texture = texture;
 
+        // ===== UPDATED: Show filename + timestamp =====
         if (timestampText != null)
         {
-            timestampText.text = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
+            string timeString = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
+            timestampText.text = $"{currentDisplayedFilename}\n{timeString}";
         }
 
         SetDeleteButtonState(true, "Delete");
+        SetDownloadButtonState(true, "Download Image");
+
         fullScreenOverlay.SetActive(true);
 
         Debug.Log($"Showing full-screen: {Path.GetFileName(filePath)}");
     }
 
-    /// <summary>
-    /// Hide full-screen overlay
-    /// </summary>
     private void HideFullScreenImage()
     {
         if (fullScreenOverlay != null)
@@ -527,13 +481,11 @@ public class GalleryViewController : MonoBehaviour
         }
 
         currentDisplayedFilePath = null;
+        currentDisplayedFilename = null;  // ← NEW: Clear filename
 
         Debug.Log("Full-screen image closed");
     }
 
-    /// <summary>
-    /// Delete currently displayed screenshot
-    /// </summary>
     private void DeleteCurrentScreenshot()
     {
         if (string.IsNullOrEmpty(currentDisplayedFilePath))
@@ -566,8 +518,39 @@ public class GalleryViewController : MonoBehaviour
     }
 
     /// <summary>
-    /// Callback when delete operation completes
+    /// Download currently displayed screenshot to iOS Photos
     /// </summary>
+    private void DownloadCurrentScreenshot()
+    {
+        if (string.IsNullOrEmpty(currentDisplayedFilePath))
+        {
+            Debug.LogWarning("GalleryViewController: No screenshot currently displayed");
+            return;
+        }
+
+        if (ScreenshotDownloadManager.Instance != null && ScreenshotDownloadManager.Instance.IsDownloadPending)
+        {
+            DebugViewController.AddDebugMessage("Download already in progress, please wait");
+            return;
+        }
+
+        string filename = Path.GetFileName(currentDisplayedFilePath);
+        DebugViewController.AddDebugMessage($"=== Download Initiated ===");
+        DebugViewController.AddDebugMessage($"File: {filename}");
+
+        SetDownloadButtonState(false, "Downloading Image...");
+
+        if (ScreenshotDownloadManager.Instance != null)
+        {
+            ScreenshotDownloadManager.Instance.DownloadScreenshotToPhotos(currentDisplayedFilePath);
+        }
+        else
+        {
+            DebugViewController.AddDebugMessage("ERROR: ScreenshotDownloadManager not found");
+            SetDownloadButtonState(true, "Download Image");
+        }
+    }
+
     public void OnDeleteComplete(bool success, string filePath)
     {
         if (success)
@@ -584,9 +567,20 @@ public class GalleryViewController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Set delete button state
-    /// </summary>
+    public void OnDownloadComplete(bool success, string filePath)
+    {
+        if (success)
+        {
+            DebugViewController.AddDebugMessage("✓ Download operation complete");
+            SetDownloadButtonState(true, "Download Image");
+        }
+        else
+        {
+            DebugViewController.AddDebugMessage("✗ Download operation failed");
+            SetDownloadButtonState(true, "Download Image");
+        }
+    }
+
     private void SetDeleteButtonState(bool enabled, string text)
     {
         if (deleteFSIOButton != null)
@@ -597,6 +591,19 @@ public class GalleryViewController : MonoBehaviour
         if (deleteFSIOButtonText != null)
         {
             deleteFSIOButtonText.text = text;
+        }
+    }
+
+    private void SetDownloadButtonState(bool enabled, string text)
+    {
+        if (downloadFSIOButton != null)
+        {
+            downloadFSIOButton.interactable = enabled;
+        }
+
+        if (downloadFSIOButtonText != null)
+        {
+            downloadFSIOButtonText.text = text;
         }
     }
 
