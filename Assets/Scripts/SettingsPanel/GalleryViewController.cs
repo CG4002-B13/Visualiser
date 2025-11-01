@@ -24,6 +24,9 @@ public class GalleryViewController : MonoBehaviour
     [SerializeField] private Button deleteFSIOButton;
     [SerializeField] private TextMeshProUGUI timestampText;
 
+    [Header("Delete Button")]
+    [SerializeField] private TextMeshProUGUI deleteFSIOButtonText;
+
     // Currently displayed screenshot data
     private string currentDisplayedFilePath;
     private Texture2D currentDisplayedTexture;
@@ -84,7 +87,7 @@ public class GalleryViewController : MonoBehaviour
         ClearGalleryGrid();
         UnloadThumbnailTextures();
 
-        // Get current username
+        // Get current username (lowercase)
         string username = SettingsMenuController.Instance != null
             ? SettingsMenuController.Instance.GetUsername()
             : "default";
@@ -94,7 +97,7 @@ public class GalleryViewController : MonoBehaviour
             username = "default";
         }
 
-        username = username.Trim();
+        username = username.Trim().ToLower();
 
         DebugViewController.AddDebugMessage($"=== Gallery Opened ===");
         DebugViewController.AddDebugMessage($"Loading screenshots for: {username}");
@@ -135,7 +138,6 @@ public class GalleryViewController : MonoBehaviour
     /// </summary>
     public void OnScreenshotCaptured(SessionScreenshotData data)
     {
-        // No longer used - gallery refreshes from disk when opened
         Debug.Log("OnScreenshotCaptured called (deprecated - using disk-based loading)");
     }
 
@@ -293,6 +295,9 @@ public class GalleryViewController : MonoBehaviour
             timestampText.text = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
         }
 
+        // Reset delete button state
+        SetDeleteButtonState(true, "Delete");
+
         // Show overlay
         fullScreenOverlay.SetActive(true);
 
@@ -329,6 +334,7 @@ public class GalleryViewController : MonoBehaviour
 
     /// <summary>
     /// Delete currently displayed screenshot
+    /// Called when user taps delete button
     /// </summary>
     private void DeleteCurrentScreenshot()
     {
@@ -338,33 +344,72 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        string filename = Path.GetFileName(currentDisplayedFilePath);
-        DebugViewController.AddDebugMessage($"=== Deleting Screenshot ===");
-        DebugViewController.AddDebugMessage($"File: {filename}");
-
-        // Delete from disk
-        bool deleteSuccess = false;
-        if (ScreenshotManagerIOS.Instance != null)
+        // Check if delete is already in progress
+        if (ScreenshotDeleteManager.Instance != null && ScreenshotDeleteManager.Instance.IsDeletePending)
         {
-            deleteSuccess = ScreenshotManagerIOS.Instance.DeleteScreenshot(currentDisplayedFilePath);
+            DebugViewController.AddDebugMessage("Delete already in progress, please wait");
+            return;
         }
 
-        if (deleteSuccess)
+        string filename = Path.GetFileName(currentDisplayedFilePath);
+        DebugViewController.AddDebugMessage($"=== Delete Initiated ===");
+        DebugViewController.AddDebugMessage($"File: {filename}");
+
+        // Disable delete button and show "Deleting..." text
+        SetDeleteButtonState(false, "Deleting...");
+
+        // Initiate delete via ScreenshotDeleteManager
+        if (ScreenshotDeleteManager.Instance != null)
         {
-            DebugViewController.AddDebugMessage("Local file deleted");
+            ScreenshotDeleteManager.Instance.DeleteScreenshot(currentDisplayedFilePath);
+        }
+        else
+        {
+            DebugViewController.AddDebugMessage("ERROR: ScreenshotDeleteManager not found");
+            SetDeleteButtonState(true, "Delete");
+        }
+    }
 
-            // TODO: Delete from S3 (Phase 2 - Delete implementation)
-            DebugViewController.AddDebugMessage("Cloud deletion not yet implemented");
+    /// <summary>
+    /// Callback when delete operation completes
+    /// Called by ScreenshotDeleteManager
+    /// </summary>
+    public void OnDeleteComplete(bool success, string filePath)
+    {
+        if (success)
+        {
+            DebugViewController.AddDebugMessage("✓ Delete operation complete");
 
-            // Close full-screen overlay
+            // Close FSIO
             HideFullScreenImage();
 
-            // Refresh gallery to show updated list
+            // Refresh gallery to remove deleted screenshot
             RefreshGallery();
         }
         else
         {
-            DebugViewController.AddDebugMessage("Failed to delete local file");
+            DebugViewController.AddDebugMessage("✗ Delete operation failed");
+
+            // Re-enable delete button
+            SetDeleteButtonState(true, "Delete");
+
+            // Keep FSIO open so user can see screenshot is still there
+        }
+    }
+
+    /// <summary>
+    /// Set delete button state (enabled/disabled) and text
+    /// </summary>
+    private void SetDeleteButtonState(bool enabled, string text)
+    {
+        if (deleteFSIOButton != null)
+        {
+            deleteFSIOButton.interactable = enabled;
+        }
+
+        if (deleteFSIOButtonText != null)
+        {
+            deleteFSIOButtonText.text = text;
         }
     }
 
