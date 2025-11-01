@@ -78,6 +78,10 @@ public class CommandHandler : MonoBehaviour
                     HandleS3UploadResponse(messageObj);
                     break;
 
+                case "S3_DELETE_RESPONSE":
+                    HandleS3DeleteResponse(messageObj);
+                    break;
+
                 case "S3_ERROR":
                     HandleS3Error(messageObj);
                     break;
@@ -311,7 +315,7 @@ public class CommandHandler : MonoBehaviour
         }
     }
 
-    // ===== NEW: S3 UPLOAD HANDLERS =====
+    // ===== S3 UPLOAD HANDLERS =====
 
     private void HandleS3UploadResponse(JObject messageObj)
     {
@@ -341,6 +345,38 @@ public class CommandHandler : MonoBehaviour
         }
     }
 
+    // ===== S3 DELETE HANDLERS =====
+
+    private void HandleS3DeleteResponse(JObject messageObj)
+    {
+        try
+        {
+            string presignedUrl = messageObj["data"]?.ToString();
+
+            if (string.IsNullOrEmpty(presignedUrl))
+            {
+                Debug.LogWarning("CommandHandler: S3_DELETE_RESPONSE has empty data field");
+                return;
+            }
+
+            // Route to ScreenshotDeleteManager
+            if (ScreenshotDeleteManager.Instance != null)
+            {
+                ScreenshotDeleteManager.Instance.OnDeleteResponseReceived(presignedUrl);
+            }
+            else
+            {
+                Debug.LogError("CommandHandler: ScreenshotDeleteManager.Instance is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleS3DeleteResponse: {ex.Message}");
+        }
+    }
+
+    // ===== S3 ERROR HANDLER =====
+
     private void HandleS3Error(JObject messageObj)
     {
         try
@@ -352,14 +388,31 @@ public class CommandHandler : MonoBehaviour
                 errorMessage = "Unknown S3 error";
             }
 
-            // Route to ScreenshotUploadManager
-            if (ScreenshotUploadManager.Instance != null)
+            // Determine which operation failed based on pending state
+            bool uploadPending = ScreenshotUploadManager.Instance != null && ScreenshotUploadManager.Instance.IsUploadPending;
+            bool deletePending = ScreenshotDeleteManager.Instance != null && ScreenshotDeleteManager.Instance.IsDeletePending;
+
+            if (deletePending)
             {
-                ScreenshotUploadManager.Instance.OnUploadErrorReceived(errorMessage);
+                // Route to ScreenshotDeleteManager
+                if (ScreenshotDeleteManager.Instance != null)
+                {
+                    ScreenshotDeleteManager.Instance.OnDeleteErrorReceived(errorMessage);
+                }
+            }
+            else if (uploadPending)
+            {
+                // Route to ScreenshotUploadManager
+                if (ScreenshotUploadManager.Instance != null)
+                {
+                    ScreenshotUploadManager.Instance.OnUploadErrorReceived(errorMessage);
+                }
             }
             else
             {
-                Debug.LogError("CommandHandler: ScreenshotUploadManager.Instance is null");
+                // Unknown operation
+                Debug.LogWarning($"CommandHandler: S3_ERROR received but no operation pending: {errorMessage}");
+                DebugViewController.AddDebugMessage($"S3 Error: {errorMessage}");
             }
         }
         catch (Exception ex)
