@@ -27,6 +27,12 @@ public class GalleryViewController : MonoBehaviour
     [Header("Delete Button")]
     [SerializeField] private TextMeshProUGUI deleteFSIOButtonText;
 
+    [Header("Sync Status UI")]
+    [SerializeField] private TextMeshProUGUI connectionStatusText;
+    [SerializeField] private TextMeshProUGUI syncRequiredText;
+    [SerializeField] private Button syncButton;
+    [SerializeField] private TextMeshProUGUI syncButtonText;
+
     // Currently displayed screenshot data
     private string currentDisplayedFilePath;
     private Texture2D currentDisplayedTexture;
@@ -34,6 +40,11 @@ public class GalleryViewController : MonoBehaviour
 
     // Thumbnail cache (loaded textures for gallery grid)
     private List<Texture2D> thumbnailTextures = new List<Texture2D>();
+
+    // Sync tracking
+    private int pendingUploads = 0;
+    private int pendingDownloads = 0;
+    private bool isSyncInProgress = false;
 
     private void Awake()
     {
@@ -65,6 +76,11 @@ public class GalleryViewController : MonoBehaviour
             deleteFSIOButton.onClick.AddListener(DeleteCurrentScreenshot);
         }
 
+        if (syncButton != null)
+        {
+            syncButton.onClick.AddListener(OnSyncButtonClicked);
+        }
+
         if (fullScreenOverlay != null)
         {
             fullScreenOverlay.SetActive(false);
@@ -73,9 +89,58 @@ public class GalleryViewController : MonoBehaviour
         Debug.Log("GalleryViewController initialized (disk-based mode)");
     }
 
+    private void OnEnable()
+    {
+        // Subscribe to connection status changes (event-based, not polling)
+        WS_Client.OnConnectionStatusChanged += OnConnectionStatusChanged;
+    }
+
+    private void OnDisable()
+    {
+        // Unsubscribe to prevent memory leaks
+        WS_Client.OnConnectionStatusChanged -= OnConnectionStatusChanged;
+    }
+
     public void OnTabOpened()
     {
+        DebugViewController.AddDebugMessage("=== Gallery Tab Opened ===");
+
         RefreshGallery();
+        UpdateConnectionStatus();
+
+        // ===== LIGHTWEIGHT: Defer sync check to avoid memory spike on tab open =====
+        // Use coroutine to delay sync check - gives memory time to settle after thumbnail loading
+        StartCoroutine(DeferredSyncCheck());
+    }
+
+    /// <summary>
+    /// Deferred sync check - waits before checking to allow memory to settle
+    /// </summary>
+    private IEnumerator DeferredSyncCheck()
+    {
+        // Wait 2 seconds after tab open for memory to stabilize
+        yield return new WaitForSeconds(2f);
+
+        // Now safely check sync
+        if (gameObject.activeInHierarchy)  // Only if still on gallery tab
+        {
+            CheckSyncRequired();
+        }
+    }
+
+    /// <summary>
+    /// Called automatically whenever connection status changes (event-based)
+    /// </summary>
+    private void OnConnectionStatusChanged(bool isConnected)
+    {
+        UpdateConnectionStatus();
+
+        // If disconnected, disable sync button
+        if (!isConnected)
+        {
+            SetSyncButtonState(false);
+            DebugViewController.AddDebugMessage("Connection lost - sync disabled");
+        }
     }
 
     /// <summary>
@@ -99,7 +164,6 @@ public class GalleryViewController : MonoBehaviour
 
         username = username.Trim().ToLower();
 
-        DebugViewController.AddDebugMessage($"=== Gallery Opened ===");
         DebugViewController.AddDebugMessage($"Loading screenshots for: {username}");
 
         // Get screenshot files from disk
@@ -134,11 +198,163 @@ public class GalleryViewController : MonoBehaviour
     }
 
     /// <summary>
-    /// DEPRECATED: Kept for compatibility
+    /// Check sync status - LIGHTWEIGHT VERSION
+    /// Only sent if connected AND enough memory available
     /// </summary>
-    public void OnScreenshotCaptured(SessionScreenshotData data)
+    private void CheckSyncRequired()
     {
-        Debug.Log("OnScreenshotCaptured called (deprecated - using disk-based loading)");
+        if (!WS_Client.Instance.IsConnected)
+        {
+            DebugViewController.AddDebugMessage("Cannot check sync - offline");
+            syncRequiredText.text = "";
+            SetSyncButtonState(false);
+            return;
+        }
+
+        // ===== CRITICAL: Check available memory before syncing =====
+        long memoryUsedMB = System.GC.GetTotalMemory(false) / (1024 * 1024);
+        long availableMemoryMB = 2048 - memoryUsedMB;  // iPhone limit is ~2048 MB
+
+        DebugViewController.AddDebugMessage($"Memory check: {memoryUsedMB}MB used, {availableMemoryMB}MB available");
+
+        // Only check sync if we have at least 200 MB free
+        if (availableMemoryMB < 200)
+        {
+            DebugViewController.AddDebugMessage("⚠️ Insufficient memory for sync check - skipping");
+            syncRequiredText.text = "Low memory - try later";
+            SetSyncButtonState(false);
+            return;
+        }
+
+        DebugViewController.AddDebugMessage("Checking sync status...");
+
+        if (ScreenshotSyncManager.Instance != null)
+        {
+            ScreenshotSyncManager.Instance.CheckSyncStatus(
+                onComplete: (uploadsNeeded, downloadsNeeded) =>
+                {
+                    if (!gameObject.activeInHierarchy) return;  // Tab closed
+
+                    pendingUploads = uploadsNeeded;
+                    pendingDownloads = downloadsNeeded;
+                    UpdateSyncRequiredText();
+                    SetSyncButtonState(true);
+                }
+            );
+        }
+    }
+
+    /// <summary>
+    /// Update sync required text based on pending uploads/downloads
+    /// </summary>
+    private void UpdateSyncRequiredText()
+    {
+        if (pendingUploads == 0 && pendingDownloads == 0)
+        {
+            syncRequiredText.text = "";
+            DebugViewController.AddDebugMessage("✓ Fully synced with S3");
+        }
+        else
+        {
+            syncRequiredText.text = $"Sync Required - {pendingUploads} Uploads, {pendingDownloads} Downloads";
+            DebugViewController.AddDebugMessage($"Sync status: {pendingUploads} uploads, {pendingDownloads} downloads needed");
+        }
+    }
+
+    /// <summary>
+    /// Called when user clicks Sync button
+    /// </summary>
+    private void OnSyncButtonClicked()
+    {
+        if (isSyncInProgress)
+        {
+            DebugViewController.AddDebugMessage("Sync already in progress");
+            return;
+        }
+
+        if (!WS_Client.Instance.IsConnected)
+        {
+            DebugViewController.AddDebugMessage("Cannot sync - not connected");
+            return;
+        }
+
+        SetSyncButtonState(false);
+        if (syncButtonText != null)
+        {
+            syncButtonText.text = "Syncing...";
+        }
+        isSyncInProgress = true;
+
+        DebugViewController.AddDebugMessage("Starting sync operation...");
+
+        if (ScreenshotSyncManager.Instance != null)
+        {
+            ScreenshotSyncManager.Instance.PerformSync(
+                onComplete: (success) =>
+                {
+                    isSyncInProgress = false;
+
+                    if (success)
+                    {
+                        DebugViewController.AddDebugMessage("✓ Sync completed successfully");
+
+                        // Refresh gallery to show downloaded files
+                        RefreshGallery();
+
+                        // Re-check sync status (should be 0, 0 now)
+                        CheckSyncRequired();
+                    }
+                    else
+                    {
+                        DebugViewController.AddDebugMessage("✗ Sync failed");
+
+                        // Re-enable button
+                        SetSyncButtonState(true);
+                        if (syncButtonText != null)
+                        {
+                            syncButtonText.text = "Sync";
+                        }
+                    }
+                }
+            );
+        }
+    }
+
+    /// <summary>
+    /// Update connection status text (called once or when connection changes)
+    /// </summary>
+    private void UpdateConnectionStatus()
+    {
+        if (WS_Client.Instance != null && WS_Client.Instance.IsConnected)
+        {
+            if (connectionStatusText != null)
+            {
+                connectionStatusText.text = "Connected to Server: Yes";
+            }
+        }
+        else
+        {
+            if (connectionStatusText != null)
+            {
+                connectionStatusText.text = "Connected to Server: No";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set sync button state (enabled/disabled)
+    /// </summary>
+    private void SetSyncButtonState(bool enabled)
+    {
+        if (syncButton != null)
+        {
+            syncButton.interactable = enabled;
+        }
+
+        if (enabled && syncButtonText != null)
+        {
+            syncButtonText.text = "Sync";
+        }
     }
 
     /// <summary>
@@ -158,7 +374,6 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Load texture from file
         Texture2D texture = LoadTextureFromFile(filePath);
         if (texture == null)
         {
@@ -166,13 +381,9 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Store texture reference for cleanup
         thumbnailTextures.Add(texture);
-
-        // Instantiate thumbnail prefab
         GameObject thumbnailObj = Instantiate(thumbnailPrefab, gridContent);
 
-        // Get RawImage component and assign texture
         RawImage thumbnailImage = thumbnailObj.GetComponentInChildren<RawImage>();
         if (thumbnailImage != null)
         {
@@ -183,11 +394,9 @@ public class GalleryViewController : MonoBehaviour
             Debug.LogError("GalleryViewController: RawImage not found in thumbnail prefab!");
         }
 
-        // Get Button component and add click listener
         Button button = thumbnailObj.GetComponent<Button>();
         if (button != null)
         {
-            // Capture filePath in closure
             string capturedPath = filePath;
             button.onClick.AddListener(() => ShowFullScreenImage(capturedPath));
         }
@@ -263,7 +472,6 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Load full-resolution texture
         Texture2D texture = LoadTextureFromFile(filePath);
         if (texture == null)
         {
@@ -271,11 +479,9 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Store current display info
         currentDisplayedFilePath = filePath;
         currentDisplayedTexture = texture;
 
-        // Parse timestamp from filename (epoch)
         string filename = Path.GetFileNameWithoutExtension(filePath);
         if (long.TryParse(filename, out long epoch))
         {
@@ -286,19 +492,14 @@ public class GalleryViewController : MonoBehaviour
             currentDisplayedTimestamp = File.GetCreationTime(filePath);
         }
 
-        // Assign texture to full-screen image
         fullScreenRawImage.texture = texture;
 
-        // Update timestamp text
         if (timestampText != null)
         {
             timestampText.text = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
         }
 
-        // Reset delete button state
         SetDeleteButtonState(true, "Delete");
-
-        // Show overlay
         fullScreenOverlay.SetActive(true);
 
         Debug.Log($"Showing full-screen: {Path.GetFileName(filePath)}");
@@ -314,13 +515,11 @@ public class GalleryViewController : MonoBehaviour
             fullScreenOverlay.SetActive(false);
         }
 
-        // Clear texture reference
         if (fullScreenRawImage != null)
         {
             fullScreenRawImage.texture = null;
         }
 
-        // Unload full-resolution texture to free memory
         if (currentDisplayedTexture != null)
         {
             Destroy(currentDisplayedTexture);
@@ -334,7 +533,6 @@ public class GalleryViewController : MonoBehaviour
 
     /// <summary>
     /// Delete currently displayed screenshot
-    /// Called when user taps delete button
     /// </summary>
     private void DeleteCurrentScreenshot()
     {
@@ -344,7 +542,6 @@ public class GalleryViewController : MonoBehaviour
             return;
         }
 
-        // Check if delete is already in progress
         if (ScreenshotDeleteManager.Instance != null && ScreenshotDeleteManager.Instance.IsDeletePending)
         {
             DebugViewController.AddDebugMessage("Delete already in progress, please wait");
@@ -355,10 +552,8 @@ public class GalleryViewController : MonoBehaviour
         DebugViewController.AddDebugMessage($"=== Delete Initiated ===");
         DebugViewController.AddDebugMessage($"File: {filename}");
 
-        // Disable delete button and show "Deleting..." text
         SetDeleteButtonState(false, "Deleting...");
 
-        // Initiate delete via ScreenshotDeleteManager
         if (ScreenshotDeleteManager.Instance != null)
         {
             ScreenshotDeleteManager.Instance.DeleteScreenshot(currentDisplayedFilePath);
@@ -372,33 +567,25 @@ public class GalleryViewController : MonoBehaviour
 
     /// <summary>
     /// Callback when delete operation completes
-    /// Called by ScreenshotDeleteManager
     /// </summary>
     public void OnDeleteComplete(bool success, string filePath)
     {
         if (success)
         {
             DebugViewController.AddDebugMessage("✓ Delete operation complete");
-
-            // Close FSIO
             HideFullScreenImage();
-
-            // Refresh gallery to remove deleted screenshot
             RefreshGallery();
+            CheckSyncRequired();
         }
         else
         {
             DebugViewController.AddDebugMessage("✗ Delete operation failed");
-
-            // Re-enable delete button
             SetDeleteButtonState(true, "Delete");
-
-            // Keep FSIO open so user can see screenshot is still there
         }
     }
 
     /// <summary>
-    /// Set delete button state (enabled/disabled) and text
+    /// Set delete button state
     /// </summary>
     private void SetDeleteButtonState(bool enabled, string text)
     {
@@ -415,7 +602,6 @@ public class GalleryViewController : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Cleanup textures when controller is destroyed
         UnloadThumbnailTextures();
 
         if (currentDisplayedTexture != null)

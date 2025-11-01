@@ -263,6 +263,12 @@ public class StageManager : MonoBehaviour
             objectDetectionSample.enabled = false;
         }
 
+        // ===== DISABLE NIANTIC TO FREE MEMORY =====
+        if (NianticMemoryManager.Instance != null)
+        {
+            NianticMemoryManager.Instance.DisableNiantic();
+        }
+
         // Show all placed objects
         if (objectManager != null)
         {
@@ -277,6 +283,7 @@ public class StageManager : MonoBehaviour
 
         Debug.Log("Switched to Object Placement Stage");
     }
+
 
     private void ActivateObjectDetectionStage()
     {
@@ -303,6 +310,12 @@ public class StageManager : MonoBehaviour
 
         // Disable Settings Panel
         SetUIActive(settingsPanel, false);
+
+        // ===== ENABLE NIANTIC FOR OBJECT DETECTION =====
+        if (NianticMemoryManager.Instance != null)
+        {
+            NianticMemoryManager.Instance.EnableNiantic();
+        }
 
         // Start object detection
         if (objectDetectionSample != null)
@@ -357,6 +370,12 @@ public class StageManager : MonoBehaviour
         if (objectDetectionSample != null)
         {
             objectDetectionSample.enabled = false;
+        }
+
+        // ===== DISABLE NIANTIC TO FREE MEMORY =====
+        if (NianticMemoryManager.Instance != null)
+        {
+            NianticMemoryManager.Instance.DisableNiantic();
         }
 
         // Deselect any selected objects before entering settings

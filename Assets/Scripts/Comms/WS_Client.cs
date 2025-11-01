@@ -8,6 +8,16 @@ public class WS_Client : MonoBehaviour
 {
     public static WS_Client Instance { get; private set; }
 
+
+    // ===== EVENT-BASED CONNECTION STATUS =====
+    /// <summary>
+    /// Event fired whenever connection status changes
+    /// Subscribers: GalleryViewController, DebugViewController, etc.
+    /// </summary>
+    public delegate void ConnectionStatusChangedDelegate(bool isConnected);
+    public static event ConnectionStatusChangedDelegate OnConnectionStatusChanged;
+
+
 #if UNITY_IOS && !UNITY_EDITOR
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void MessageCallback(string message);
@@ -17,6 +27,7 @@ public class WS_Client : MonoBehaviour
     
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void ConnectCallback();
+
 
     [DllImport("__Internal")]
     private static extern IntPtr _CreateWebSocket(string url, string certPath, string certPassword);
@@ -40,19 +51,24 @@ public class WS_Client : MonoBehaviour
     private static extern void _SetConnectCallback(IntPtr instance, ConnectCallback callback);
 #endif
 
+
     [Header("Configuration")]
     [SerializeField] private string baseUrl = "wss://ec2-13-229-220-104.ap-southeast-1.compute.amazonaws.com:8443/ws";
     [SerializeField] private string certificateFileName = "devices-client2.p12";
     [SerializeField] private string certificatePassword = "pass";
 
+
     private IntPtr wsInstance;
     private bool isConnected = false;
+
 
     // Store current connection credentials for debugging
     private string currentUserId = "";
     private string currentSessionId = "";
 
+
     public bool IsConnected => isConnected;
+
 
     private void Awake()
     {
@@ -67,10 +83,12 @@ public class WS_Client : MonoBehaviour
         }
     }
 
+
     private void Start()
     {
         DebugViewController.AddDebugMessage("WS_Client initialized. Ready to connect.");
     }
+
 
     public void ConnectWebSocket()
     {
@@ -81,6 +99,7 @@ public class WS_Client : MonoBehaviour
             return;
         }
 
+
         // === RETRIEVE USERNAME FROM SETTINGS ===
         if (SettingsMenuController.Instance == null)
         {
@@ -88,6 +107,7 @@ public class WS_Client : MonoBehaviour
             DebugViewController.UpdateConnectionButtons(false);
             return;
         }
+
 
         string username = SettingsMenuController.Instance.GetUsername();
         
@@ -101,8 +121,10 @@ public class WS_Client : MonoBehaviour
             return;
         }
 
+
         // Trim whitespace and convert to lowercase
         username = username.Trim().ToLower();
+
 
         try
         {
@@ -168,6 +190,7 @@ public class WS_Client : MonoBehaviour
 #endif
     }
 
+
     public void ManualDisconnect()
     {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -175,6 +198,8 @@ public class WS_Client : MonoBehaviour
         {
             _CloseWebSocket(wsInstance);
             wsInstance = IntPtr.Zero;
+            
+            // Update connection state BEFORE broadcasting event
             isConnected = false;
             
             DebugViewController.AddDebugMessage("WebSocket disconnected");
@@ -198,16 +223,21 @@ public class WS_Client : MonoBehaviour
             {
                 StageManager.Instance.UpdateControlsVisibility();
             }
+            
+            // ===== BROADCAST CONNECTION STATUS CHANGE =====
+            BroadcastConnectionStatusChanged(false);
         }
 #else
         DebugViewController.AddDebugMessage("Disconnect only available on iOS device");
 #endif
     }
 
+
     public void SendPingMessage()
     {
         SendMessage("{\"type\":\"ping\",\"timestamp\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + "}");
     }
+
 
     public void SendMessage(string message)
     {
@@ -226,6 +256,7 @@ public class WS_Client : MonoBehaviour
 #endif
     }
 
+
 #if UNITY_IOS && !UNITY_EDITOR
     [MonoPInvokeCallback(typeof(MessageCallback))]
     private static void OnMessageReceived(string message)
@@ -243,6 +274,7 @@ public class WS_Client : MonoBehaviour
         }
     }
 
+
     [MonoPInvokeCallback(typeof(ErrorCallback))]
     private static void OnError(string error)
     {
@@ -250,7 +282,11 @@ public class WS_Client : MonoBehaviour
         {
             UnityMainThreadDispatcher.Enqueue(() => {
                 DebugViewController.AddDebugMessage($"ERROR: {error}");
+                
+                // Only broadcast if we were connected before
+                bool wasConnected = Instance.isConnected;
                 Instance.isConnected = false;
+                
                 DebugViewController.UpdateConnectionButtons(false);
                 
                 // Update Show Controls state
@@ -264,9 +300,16 @@ public class WS_Client : MonoBehaviour
                 {
                     StageManager.Instance.UpdateControlsVisibility();
                 }
+                
+                // ===== BROADCAST CONNECTION STATUS CHANGE =====
+                if (wasConnected)
+                {
+                    Instance.BroadcastConnectionStatusChanged(false);
+                }
             });
         }
     }
+
 
     [MonoPInvokeCallback(typeof(ConnectCallback))]
     private static void OnConnected()
@@ -274,9 +317,11 @@ public class WS_Client : MonoBehaviour
         if (Instance != null)
         {
             UnityMainThreadDispatcher.Enqueue(() => {
+                // Update connection state BEFORE broadcasting event
+                Instance.isConnected = true;
+                
                 DebugViewController.AddDebugMessage("===== WebSocket connected successfully! =====");
                 DebugViewController.AddDebugMessage($"Connected as: {Instance.currentUserId}");
-                Instance.isConnected = true;
                 DebugViewController.UpdateConnectionButtons(true);
                 
                 // Update Show Controls state
@@ -290,10 +335,32 @@ public class WS_Client : MonoBehaviour
                 {
                     StageManager.Instance.UpdateControlsVisibility();
                 }
+                
+                // ===== BROADCAST CONNECTION STATUS CHANGE =====
+                Instance.BroadcastConnectionStatusChanged(true);
             });
         }
     }
 #endif
+
+
+    /// <summary>
+    /// Broadcast connection status change to all subscribers
+    /// This is called when connection state changes
+    /// Subscribers will be notified WITHOUT polling
+    /// </summary>
+    private void BroadcastConnectionStatusChanged(bool newState)
+    {
+        try
+        {
+            OnConnectionStatusChanged?.Invoke(newState);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"WS_Client: Error broadcasting connection status: {ex.Message}");
+        }
+    }
+
 
     private void OnDestroy()
     {
@@ -301,18 +368,25 @@ public class WS_Client : MonoBehaviour
         if (wsInstance != IntPtr.Zero)
         {
             _CloseWebSocket(wsInstance);
+            wsInstance = IntPtr.Zero;
         }
 #endif
+
 
         if (Instance == this)
         {
             Instance = null;
         }
+
+        // Unsubscribe all listeners to prevent memory leaks
+        OnConnectionStatusChanged = null;
     }
 
-    // Public getters
+
+    // ===== PUBLIC GETTERS =====
     public string GetCurrentUserId() => currentUserId;
     public string GetCurrentSessionId() => currentSessionId;
+
 
     /// <summary>
     /// Get the connection timestamp from currentUserId
@@ -325,6 +399,7 @@ public class WS_Client : MonoBehaviour
             Debug.LogWarning("WS_Client: currentUserId is empty");
             return 0;
         }
+
 
         try
         {

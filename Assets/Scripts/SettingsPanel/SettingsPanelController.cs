@@ -87,7 +87,7 @@ public class SettingsPanelController : MonoBehaviour
         // Initialize the gallery viewer page if needed
         if (galleryViewController != null)
         {
-            galleryViewController.OnTabOpened();
+            galleryViewController.OnTabOpened();  // This now triggers CheckSyncRequired()
         }
 
         Debug.Log("Gallery Tab Activated");

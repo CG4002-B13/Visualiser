@@ -78,6 +78,10 @@ public class CommandHandler : MonoBehaviour
                     HandleS3UploadResponse(messageObj);
                     break;
 
+                case "S3_SYNC_RESPONSE":
+                    HandleS3SyncResponse(messageObj);
+                    break;
+
                 case "S3_DELETE_RESPONSE":
                     HandleS3DeleteResponse(messageObj);
                     break;
@@ -342,6 +346,30 @@ public class CommandHandler : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"CommandHandler: Error in HandleS3UploadResponse: {ex.Message}");
+        }
+    }
+
+    // ===== S3 SYNC HANDLERS =====
+
+    private void HandleS3SyncResponse(JObject messageObj)
+    {
+        try
+        {
+            DebugViewController.AddDebugMessage("=== S3 Sync Response Received ===");
+
+            // Pass to ScreenshotSyncManager
+            if (ScreenshotSyncManager.Instance != null)
+            {
+                ScreenshotSyncManager.OnSyncResponseReceived(messageObj);
+            }
+            else
+            {
+                Debug.LogError("CommandHandler: ScreenshotSyncManager.Instance is null");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleS3SyncResponse: {ex.Message}");
         }
     }
 
