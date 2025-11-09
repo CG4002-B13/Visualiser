@@ -310,19 +310,6 @@ public class CommandHandler : MonoBehaviour
                     Debug.LogError("CommandHandler: StageManager.Instance is null");
                 }
             }
-            else if (result.ToUpper() == "TOGGLE")
-            {
-                DebugViewController.AddDebugMessage("TOGGLE command: Toggling connection");
-
-                if (DebugViewController.Instance != null)
-                {
-                    DebugViewController.Instance.ToggleConnection();
-                }
-                else
-                {
-                    Debug.LogError("CommandHandler: DebugViewController.Instance is null");
-                }
-            }
             else
             {
                 Debug.LogWarning($"CommandHandler: Unknown SET result '{result}'");
