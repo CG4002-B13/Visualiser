@@ -312,8 +312,16 @@ public class CommandHandler : MonoBehaviour
             }
             else if (result.ToUpper() == "TOGGLE")
             {
-                DebugViewController.AddDebugMessage("TOGGLE command received (not yet implemented)");
-                Debug.Log("CommandHandler: TOGGLE functionality not yet implemented");
+                DebugViewController.AddDebugMessage("TOGGLE command: Toggling connection");
+
+                if (DebugViewController.Instance != null)
+                {
+                    DebugViewController.Instance.ToggleConnection();
+                }
+                else
+                {
+                    Debug.LogError("CommandHandler: DebugViewController.Instance is null");
+                }
             }
             else
             {
