@@ -36,7 +36,6 @@ public class StageManager : MonoBehaviour
     [SerializeField] private GameObject objectDetectionButton;
     [SerializeField] private GameObject screenshotButton;
     [SerializeField] private GameObject connectionButton;
-    [SerializeField] private GameObject xrModeToggleButton;
     [SerializeField] private GameObject settingsGearButton;
 
     [Header("Settings Panel")]
@@ -251,7 +250,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(objectDetectionButton, true);
         SetUIActive(screenshotButton, true);
         SetUIActive(connectionButton, true);
-        SetUIActive(xrModeToggleButton, true);
         SetUIActive(settingsGearButton, true);
 
         // Disable Settings Panel
@@ -284,7 +282,6 @@ public class StageManager : MonoBehaviour
         Debug.Log("Switched to Object Placement Stage");
     }
 
-
     private void ActivateObjectDetectionStage()
     {
         // Disable Object Placement UI
@@ -305,7 +302,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(objectDetectionButton, true);
         SetUIActive(screenshotButton, true);
         SetUIActive(connectionButton, true);
-        SetUIActive(xrModeToggleButton, true);
         SetUIActive(settingsGearButton, true);
 
         // Disable Settings Panel
@@ -360,7 +356,6 @@ public class StageManager : MonoBehaviour
         SetUIActive(objectDetectionButton, false);
         SetUIActive(screenshotButton, false);
         SetUIActive(connectionButton, false);
-        SetUIActive(xrModeToggleButton, false);
         SetUIActive(settingsGearButton, false);
 
         // Enable Settings Panel
