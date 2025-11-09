@@ -90,6 +90,15 @@ public class CommandHandler : MonoBehaviour
                     HandleS3Error(messageObj);
                     break;
 
+
+                case "DEBUG_GESTURE_PING":
+                    HandleDebugGesturePing(messageObj);
+                    break;
+
+                case "DEBUG_VOICE_PING":
+                    HandleDebugVoicePing(messageObj);
+                    break;
+
                 default:
                     Debug.LogWarning($"CommandHandler: Unknown eventType '{eventType}'");
                     break;
@@ -449,6 +458,108 @@ public class CommandHandler : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"CommandHandler: Error in HandleS3Error: {ex.Message}");
+        }
+    }
+
+    // ===== DEBUG PING-PONG HANDLERS =====
+
+    private void HandleDebugGesturePing(JObject messageObj)
+    {
+        try
+        {
+            DebugViewController.AddDebugMessage("=== DEBUG_GESTURE_PING Received ===");
+
+            if (WS_Client.Instance == null)
+            {
+                DebugViewController.AddDebugMessage("ERROR: WS_Client.Instance is null");
+                return;
+            }
+
+            if (!WS_Client.Instance.IsConnected)
+            {
+                DebugViewController.AddDebugMessage("ERROR: Not connected");
+                return;
+            }
+
+            string userId = WS_Client.Instance.GetCurrentUserId();
+            string sessionId = WS_Client.Instance.GetCurrentSessionId();
+
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(sessionId))
+            {
+                DebugViewController.AddDebugMessage("ERROR: UserId or SessionId not available");
+                return;
+            }
+
+            long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            JObject pongResponse = new JObject
+            {
+                ["EventType"] = "DEBUG_GESTURE_PONG",
+                ["UserId"] = userId,
+                ["SessionId"] = sessionId,
+                ["Timestamp"] = currentTimestamp,
+                ["Data"] = null
+            };
+
+            string jsonResponse = pongResponse.ToString(Newtonsoft.Json.Formatting.None);
+
+            WS_Client.Instance.SendMessage(jsonResponse);
+            DebugViewController.AddDebugMessage("✓ DEBUG_GESTURE_PONG sent");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleDebugGesturePing: {ex.Message}");
+            DebugViewController.AddDebugMessage($"ERROR sending DEBUG_GESTURE_PONG: {ex.Message}");
+        }
+    }
+
+    private void HandleDebugVoicePing(JObject messageObj)
+    {
+        try
+        {
+            DebugViewController.AddDebugMessage("=== DEBUG_VOICE_PING Received ===");
+
+            if (WS_Client.Instance == null)
+            {
+                DebugViewController.AddDebugMessage("ERROR: WS_Client.Instance is null");
+                return;
+            }
+
+            if (!WS_Client.Instance.IsConnected)
+            {
+                DebugViewController.AddDebugMessage("ERROR: Not connected");
+                return;
+            }
+
+            string userId = WS_Client.Instance.GetCurrentUserId();
+            string sessionId = WS_Client.Instance.GetCurrentSessionId();
+
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(sessionId))
+            {
+                DebugViewController.AddDebugMessage("ERROR: UserId or SessionId not available");
+                return;
+            }
+
+            long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            JObject pongResponse = new JObject
+            {
+                ["EventType"] = "DEBUG_VOICE_PONG",
+                ["UserId"] = userId,
+                ["SessionId"] = sessionId,
+                ["Timestamp"] = currentTimestamp,
+                ["Data"] = null
+            };
+
+            string jsonResponse = pongResponse.ToString(Newtonsoft.Json.Formatting.None);
+
+            WS_Client.Instance.SendMessage(jsonResponse);
+            DebugViewController.AddDebugMessage("✓ DEBUG_VOICE_PONG sent");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"CommandHandler: Error in HandleDebugVoicePing: {ex.Message}");
+            DebugViewController.AddDebugMessage($"ERROR sending DEBUG_VOICE_PONG: {ex.Message}");
         }
     }
 }
