@@ -68,7 +68,7 @@ public class ScreenshotDownloadManager : MonoBehaviour
             // Call native iOS function to save to Photos
             ScreenshotManagerIOS.Instance.SaveToIOSPhotos(filePath);
             
-            DebugViewController.AddDebugMessage("✓ Image saved to Photos app");
+            DebugViewController.AddDebugMessage(" Image saved to Photos app");
 #else
             DebugViewController.AddDebugMessage("Download only available on iOS device");
 #endif

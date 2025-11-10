@@ -5,6 +5,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Not using this file in the project. 
+/// This file was made as for use before we transitioned to using ScreenshotManagerIOS file.
+/// </summary>
+
 public class ScreenshotManager : MonoBehaviour
 {
     public static ScreenshotManager Instance { get; private set; }

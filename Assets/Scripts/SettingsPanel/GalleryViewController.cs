@@ -202,7 +202,7 @@ public class GalleryViewController : MonoBehaviour
 
         if (availableMemoryMB < 200)
         {
-            DebugViewController.AddDebugMessage("⚠️ Insufficient memory for sync check - skipping");
+            DebugViewController.AddDebugMessage("===Insufficient memory for sync check - skipping===");
             syncRequiredText.text = "Low memory - try later";
             SetSyncButtonState(false);
             return;
@@ -231,7 +231,7 @@ public class GalleryViewController : MonoBehaviour
         if (pendingUploads == 0 && pendingDownloads == 0)
         {
             syncRequiredText.text = "";
-            DebugViewController.AddDebugMessage("✓ Fully synced with S3");
+            DebugViewController.AddDebugMessage(" ===Fully synced with S3===");
         }
         else
         {
@@ -272,13 +272,13 @@ public class GalleryViewController : MonoBehaviour
 
                     if (success)
                     {
-                        DebugViewController.AddDebugMessage("✓ Sync completed successfully");
+                        DebugViewController.AddDebugMessage(" ===Sync completed successfully===");
                         RefreshGallery();
                         CheckSyncRequired();
                     }
                     else
                     {
-                        DebugViewController.AddDebugMessage("✗ Sync failed");
+                        DebugViewController.AddDebugMessage(" =#= Sync failed =#=");
                         SetSyncButtonState(true);
                         if (syncButtonText != null)
                         {
@@ -555,14 +555,14 @@ public class GalleryViewController : MonoBehaviour
     {
         if (success)
         {
-            DebugViewController.AddDebugMessage("✓ Delete operation complete");
+            DebugViewController.AddDebugMessage(" === Delete operation complete ===");
             HideFullScreenImage();
             RefreshGallery();
             CheckSyncRequired();
         }
         else
         {
-            DebugViewController.AddDebugMessage("✗ Delete operation failed");
+            DebugViewController.AddDebugMessage(" =#= Delete operation failed =#=");
             SetDeleteButtonState(true, "Delete");
         }
     }
@@ -571,12 +571,12 @@ public class GalleryViewController : MonoBehaviour
     {
         if (success)
         {
-            DebugViewController.AddDebugMessage("✓ Download operation complete");
+            DebugViewController.AddDebugMessage(" === Download operation complete ===");
             SetDownloadButtonState(true, "Download Image");
         }
         else
         {
-            DebugViewController.AddDebugMessage("✗ Download operation failed");
+            DebugViewController.AddDebugMessage(" =#= Download operation failed =#=");
             SetDownloadButtonState(true, "Download Image");
         }
     }

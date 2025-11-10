@@ -174,7 +174,7 @@ public class ScreenshotDeleteManager : MonoBehaviour
         pendingPresignedUrl = presignedUrl;
 
         // Debug log URL details
-        DebugViewController.AddDebugMessage("✓ Presigned DELETE URL received");
+        DebugViewController.AddDebugMessage(" Presigned DELETE URL received");
         DebugViewController.AddDebugMessage($"URL length: {presignedUrl.Length}");
         DebugViewController.AddDebugMessage($"URL preview: {presignedUrl.Substring(0, Math.Min(80, presignedUrl.Length))}...");
 
@@ -216,9 +216,6 @@ public class ScreenshotDeleteManager : MonoBehaviour
         DebugViewController.AddDebugMessage($"=== S3 Delete Attempt {currentAttempt}/{maxRetryAttempts} ===");
         DebugViewController.AddDebugMessage($"File: {Path.GetFileName(localFilePath)}");
 
-        // ===== FIXED: Use proper HTTP DELETE method for S3 =====
-        // Unity's UnityWebRequest.Delete() doesn't work properly with presigned URLs
-        // We must create a custom DELETE request instead
         UnityWebRequest request = new UnityWebRequest(presignedUrl, "DELETE");
         request.downloadHandler = new DownloadHandlerBuffer();
         request.uploadHandler = new UploadHandlerRaw(new byte[0]); // Empty body
@@ -238,9 +235,6 @@ public class ScreenshotDeleteManager : MonoBehaviour
             DebugViewController.AddDebugMessage($"Response body: {request.downloadHandler.text}");
         }
 
-        // ===== FIXED: Strict response code checking =====
-        // S3 DELETE returns 204 No Content on success (sometimes 200 OK)
-        // Only these codes indicate successful deletion
         bool isSuccessfulDelete = request.result == UnityWebRequest.Result.Success &&
                                    (request.responseCode == 204 || request.responseCode == 200);
 
@@ -256,7 +250,7 @@ public class ScreenshotDeleteManager : MonoBehaviour
 
             if (localDeleteSuccess)
             {
-                DebugViewController.AddDebugMessage("✓ Local file deleted");
+                DebugViewController.AddDebugMessage("Local file deleted");
                 DebugViewController.AddDebugMessage("Screenshot deleted from both cloud and device");
 
                 // Clear pending state

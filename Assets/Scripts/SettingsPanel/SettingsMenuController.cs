@@ -212,7 +212,7 @@ public class SettingsMenuController : MonoBehaviour
             }
         }
 
-        DebugViewController.AddDebugMessage($"✓ Mode {mode} applied to {successCount}/{allObjects.Count} objects");
+        DebugViewController.AddDebugMessage($" ===Mode {mode} applied to {successCount}/{allObjects.Count} objects=== ");
 
         if (successCount < allObjects.Count)
         {
@@ -446,6 +446,6 @@ public class SettingsMenuController : MonoBehaviour
         virtualState.SetDataFlowMode(mode);
         virtualState.SetSensitivityMultiplier(actualSensitivity);
 
-        DebugViewController.AddDebugMessage($"✓ Settings applied to '{controllable.gameObject.name}': Mode={mode}, Sensitivity={actualSensitivity:F1}x");
+        DebugViewController.AddDebugMessage($" *** Settings applied to '{controllable.gameObject.name}': Mode={mode}, Sensitivity={actualSensitivity:F1}x *** ");
     }
 }

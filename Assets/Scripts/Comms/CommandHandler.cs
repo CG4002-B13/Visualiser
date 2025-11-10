@@ -504,7 +504,7 @@ public class CommandHandler : MonoBehaviour
             string jsonResponse = pongResponse.ToString(Newtonsoft.Json.Formatting.None);
 
             WS_Client.Instance.SendMessage(jsonResponse);
-            DebugViewController.AddDebugMessage("✓ DEBUG_GESTURE_PONG sent");
+            DebugViewController.AddDebugMessage("=== DEBUG_GESTURE_PONG sent ===");
         }
         catch (Exception ex)
         {
@@ -554,7 +554,7 @@ public class CommandHandler : MonoBehaviour
             string jsonResponse = pongResponse.ToString(Newtonsoft.Json.Formatting.None);
 
             WS_Client.Instance.SendMessage(jsonResponse);
-            DebugViewController.AddDebugMessage("✓ DEBUG_VOICE_PONG sent");
+            DebugViewController.AddDebugMessage(" ===DEBUG_VOICE_PONG sent=== ");
         }
         catch (Exception ex)
         {

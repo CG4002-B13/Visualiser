@@ -46,7 +46,7 @@ public class ScreenshotSyncManager : MonoBehaviour
 
 
     /// <summary>
-    /// Check sync status - LIGHTWEIGHT
+    /// Check sync status
     /// Load file list only when actually syncing, not on tab open
     /// </summary>
     public void CheckSyncStatus(Action<int, int> onComplete)
@@ -158,7 +158,7 @@ public class ScreenshotSyncManager : MonoBehaviour
 
 
     /// <summary>
-    /// Send sync request to server - LIGHTWEIGHT
+    /// Send sync request to server
     /// </summary>
     private IEnumerator SendSyncRequest(Action<JObject> onResponse)
     {
@@ -194,7 +194,7 @@ public class ScreenshotSyncManager : MonoBehaviour
         // ===== CRITICAL: Only add files if count is reasonable =====
         if (localFiles.Length > 100)
         {
-            DebugViewController.AddDebugMessage($"⚠️ Too many files ({localFiles.Length}) - only syncing first 100");
+            DebugViewController.AddDebugMessage($" Too many files ({localFiles.Length}) - only syncing first 100");
             // Limit to 100 files to prevent massive JSON
             for (int i = 0; i < 100; i++)
             {
@@ -385,7 +385,7 @@ public class ScreenshotSyncManager : MonoBehaviour
 
 
         // ===== LIGHTWEIGHT: Download directly to disk, not memory =====
-        string tempPath = Path.Combine(Path.GetTempPath(), filename);  // ← FIXED: Use Path.GetTempPath()
+        string tempPath = Path.Combine(Path.GetTempPath(), filename);
         UnityWebRequest request = new UnityWebRequest(presignedUrl);
         request.downloadHandler = new DownloadHandlerFile(tempPath);
         request.timeout = (int)downloadTimeout;
@@ -421,7 +421,7 @@ public class ScreenshotSyncManager : MonoBehaviour
                 File.Move(tempPath, finalPath);
 
 
-                DebugViewController.AddDebugMessage($"✓ Downloaded: {filename}");
+                DebugViewController.AddDebugMessage($" Downloaded: {filename}");
                 success = true;
             }
             else
@@ -489,7 +489,7 @@ public class ScreenshotSyncManager : MonoBehaviour
         {
             if (request.result == UnityWebRequest.Result.Success)
             {
-                DebugViewController.AddDebugMessage($"✓ Uploaded: {filename}");
+                DebugViewController.AddDebugMessage($"Uploaded: {filename}");
                 success = true;
             }
             else

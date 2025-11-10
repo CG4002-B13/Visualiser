@@ -100,11 +100,7 @@ public class ScreenshotUploadManager : MonoBehaviour
             return;
         }
 
-        // ===== FIXED: Use screenshot timestamp for Timestamp field =====
-        // This ensures:
-        // - Local file: username/screenshotEpochTimestamp.jpg
-        // - S3 file: username/screenshotEpochTimestamp.jpg (MATCHES!)
-        // - Delete request: Delete username/screenshotEpochTimestamp.jpg (WORKS!)
+        // ===== Use screenshot timestamp for Timestamp field =====
         long timestampForRequest = screenshotEpochTimestamp;
 
         // Build request message
@@ -113,7 +109,7 @@ public class ScreenshotUploadManager : MonoBehaviour
             ["EventType"] = "S3_UPLOAD_REQUEST",
             ["UserId"] = userId,                    // From connection (e.g., "parth-1761884142983")
             ["SessionId"] = sessionId,              // From connection (e.g., "parth")
-            ["Timestamp"] = timestampForRequest,   // ← SCREENSHOT timestamp (consistent!)
+            ["Timestamp"] = timestampForRequest,   // ← SCREENSHOT timestamp 
             ["Data"] = null
         };
 
@@ -140,7 +136,7 @@ public class ScreenshotUploadManager : MonoBehaviour
         }
 
         pendingPresignedUrl = presignedUrl;
-        DebugViewController.AddDebugMessage("✓ Presigned URL received");
+        DebugViewController.AddDebugMessage("***Presigned URL received***");
 
         // Start actual upload to S3
         StartCoroutine(UploadToS3(presignedUrl, pendingFilePath));
