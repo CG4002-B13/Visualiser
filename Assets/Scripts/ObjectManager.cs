@@ -351,7 +351,7 @@ public class ObjectManager : MonoBehaviour
         }
     }
 
-    // NEW: Method to set data flow mode on currently selected object
+    // Method to set data flow mode on currently selected object
     public void SetDataFlowMode(VirtualJoystickState.DataFlowMode mode)
     {
         if (currentlySelectedObject != null)

@@ -30,7 +30,7 @@ public class UIManager : MonoBehaviour
         { "Table", -268f },
         { "Chair", -179f },
         { "Lamp", -90f },
-        { "TV Console", -1f },
+        { "Tv", -1f },
         { "Bed", 88f },
         { "Plant", 177f },
         { "Sofa", 266f }
@@ -209,7 +209,7 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // NEW: Show delete button
+    // Show delete button
     public void ShowDeleteButton()
     {
         if (deleteButton != null)
@@ -218,7 +218,7 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // NEW: Hide delete button
+    // Hide delete button
     public void HideDeleteButton()
     {
         if (deleteButton != null)
@@ -227,7 +227,7 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // NEW: Delete button click handler
+    // Delete button click handler
     private void OnDeleteButtonClicked()
     {
         if (ObjectManager.Instance != null)
