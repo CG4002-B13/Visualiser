@@ -101,6 +101,7 @@ public class CommandHandler : MonoBehaviour
 
                 default:
                     Debug.LogWarning($"CommandHandler: Unknown eventType '{eventType}'");
+                    DebugViewController.AddDebugMessage($"CommandHandler: Unknown eventType '{eventType}'. Skipping Command.");
                     break;
             }
         }
