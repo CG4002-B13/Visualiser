@@ -4,6 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
+/// <summary>
+/// Starting script to control objects using one joystick + 2 buttons + 1 mode toggler (button)
+/// </summary>
+
 [RequireComponent(typeof(Rigidbody), typeof(BoxCollider))]
 public class CubeController : MonoBehaviour
 {
