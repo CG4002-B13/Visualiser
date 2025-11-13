@@ -390,7 +390,7 @@ public class ObjectManager : MonoBehaviour
                 return chairPrefab;
             case "lamp":
                 return lampPrefab;
-            case "tv console":
+            case "tv":
                 return tvConsolePrefab;
             case "bed":
                 return bedPrefab;
