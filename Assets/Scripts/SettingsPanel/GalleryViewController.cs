@@ -41,7 +41,7 @@ public class GalleryViewController : MonoBehaviour
     private string currentDisplayedFilePath;
     private Texture2D currentDisplayedTexture;
     private DateTime currentDisplayedTimestamp;
-    private string currentDisplayedFilename;  // ← NEW: Store filename
+    private string currentDisplayedFilename;  // ← Store filename
 
     // Thumbnail cache (loaded textures for gallery grid)
     private List<Texture2D> thumbnailTextures = new List<Texture2D>();
@@ -433,7 +433,7 @@ public class GalleryViewController : MonoBehaviour
 
         currentDisplayedFilePath = filePath;
         currentDisplayedTexture = texture;
-        currentDisplayedFilename = Path.GetFileName(filePath);  // ← NEW: Store filename
+        currentDisplayedFilename = Path.GetFileName(filePath);  // Store filename
 
         string filename = Path.GetFileNameWithoutExtension(filePath);
         if (long.TryParse(filename, out long epoch))
@@ -447,7 +447,7 @@ public class GalleryViewController : MonoBehaviour
 
         fullScreenRawImage.texture = texture;
 
-        // ===== UPDATED: Show filename + timestamp =====
+        // ===== Show filename + timestamp =====
         if (timestampText != null)
         {
             string timeString = currentDisplayedTimestamp.ToString("MMM dd, yyyy\nhh:mm tt");
@@ -481,7 +481,7 @@ public class GalleryViewController : MonoBehaviour
         }
 
         currentDisplayedFilePath = null;
-        currentDisplayedFilename = null;  // ← NEW: Clear filename
+        currentDisplayedFilename = null;
 
         Debug.Log("Full-screen image closed");
     }
