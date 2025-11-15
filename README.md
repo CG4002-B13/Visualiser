@@ -169,7 +169,7 @@ Where to change key values:
 
 **CG4002 Capstone Project** — National University of Singapore, Computer Engineering  
 Development team:
-- Davian Kho (Lead - Communications)
+- Davian Kho Yong Quan (Lead - Communications)
 - Low Tjun Lym (Lead - Hardware)
 - Ong Wei Xiang (Lead - AI)
 - Gandhi Parth Sanjay (Lead — Visualiser)
