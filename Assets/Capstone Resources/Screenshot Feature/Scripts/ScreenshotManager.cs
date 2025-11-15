@@ -185,14 +185,6 @@ public class ScreenshotManager : MonoBehaviour
     {
         if (File.Exists(filePath))
         {
-            // Use NativeGallery plugin or iOS native code to save
-            // For now, we'll use a simple approach with Application.persistentDataPath
-            // The file will be accessible through Files app
-
-            // Note: For direct Photos app integration, you'll need to add
-            // NSPhotoLibraryUsageDescription and NSPhotoLibraryAddUsageDescription
-            // to your Info.plist
-
             Debug.Log($"Screenshot saved to: {filePath}");
             Debug.Log("Access via Files app > On My iPhone > [Your App Name]");
         }

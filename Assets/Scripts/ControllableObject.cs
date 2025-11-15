@@ -174,7 +174,7 @@ public class ControllableObject : MonoBehaviour
             zMove = zMoveForward - zMoveBackward;
         }
 
-        // UNCHANGED: Same movement application for both modes
+        //  Same movement application for both modes
         Vector3 move = new Vector3(xMove, yMove, zMove);
         Vector3 displacement = move * Time.deltaTime;
 
@@ -185,14 +185,14 @@ public class ControllableObject : MonoBehaviour
     {
         float pitch, roll, yaw;
 
-        // NEW: Check if using virtual (remote) or real (local) input
+        // Check if using virtual (remote) or real (local) input
         if (virtualState != null && virtualState.IsRemoteControlled)
         {
             // REMOTE CONTROL: Read from virtual joystick state
             pitch = -virtualState.GetRotaryVertical() * _rotationSpeed * Time.deltaTime;
             roll = -virtualState.GetRotaryHorizontal() * _rotationSpeed * Time.deltaTime;
 
-            // CHANGED: Use continuous yaw value instead of buttons
+            // Use continuous yaw value instead of buttons
             yaw = virtualState.GetYaw() * _rotationSpeed * Time.deltaTime;
         }
         else
@@ -207,7 +207,7 @@ public class ControllableObject : MonoBehaviour
             yaw = yawLeft - yawRight;
         }
 
-        // UNCHANGED: Same rotation application for both modes
+        // Same rotation application for both modes
         Vector3 eulerRotation = new Vector3(pitch, yaw, roll);
         Quaternion deltaRotation = Quaternion.Euler(eulerRotation);
 

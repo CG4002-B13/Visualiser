@@ -52,7 +52,7 @@ public class iOSBuildPostProcessor
         project.WriteToFile(projectPath);
 
 
-        // ===== NEW: Add Info.plist permissions =====
+        // ===== Add Info.plist permissions =====
         // Get the Info.plist file path
         string infoPlistPath = pathToBuiltProject + "/Info.plist";
 
