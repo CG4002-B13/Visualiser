@@ -148,14 +148,6 @@ Where to change key values:
 
 ---
 
-## ⚙️ Troubleshooting tips
-
-- Not connected to server? Check certificate location (`Assets/StreamingAssets/`), server URL in `WS_Client.cs`, and the device network.
-- Joystick jitter? Increase dead zone threshold or lower sensitivity in Settings.
-- Sync failing or large downloads? Confirm S3 presigned URL generation and backend respects the sync limit.
-
----
-
 ## 📚 References
 
 - Unity AR Foundation: https://docs.unity3d.com/Packages/com.unity.xr.arfoundation@6.0/manual/index.html
