@@ -177,7 +177,7 @@ Development team:
 ---
 <div align="center">
 
- ***Made with ❤️ and ☕ using Unity & ARKit****
+ ***Made with ❤️ and ☕ using Unity***
 
 </div>
 
