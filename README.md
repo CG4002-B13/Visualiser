@@ -40,7 +40,7 @@ B13 is an iOS AR app for placing and manipulating virtual furniture using touch 
 - Capture screenshots and upload/download via S3 using presigned URLs.
 - Per-user folders (screenshots/{username}/) and bidirectional sync (default safety cap: 100 files per sync).
 
-### 🤖 AI Object Detection (optional)
+### 🤖 AI Object Detection
 - Integrates Niantic Lightship for on-device object detection and bounding boxes.
 - Toggle between placement and detection modes.
 
@@ -50,8 +50,8 @@ B13 is an iOS AR app for placing and manipulating virtual furniture using touch 
 
 - Frontend: Unity 2022.3 LTS (2022.3.62f1)
 - AR: AR Foundation + ARKit (iOS)
-- Optional object detection: Niantic Lightship
-- Networking: Native iOS WebSocket with mTLS (P12 certificate)
+- Object detection: Niantic Lightship
+- Networking: Native iOS WebSocket with mTLS (using P12 certificate)
 - Cloud: AWS S3 with presigned URLs
 - JSON parsing: Newtonsoft.Json
 - Native iOS plugins for Photos integration
@@ -80,15 +80,15 @@ Relevant code areas:
 ### Prerequisites
 - macOS with Xcode 14+
 - Unity 2022.3 LTS (2022.3.62f1 recommended)
-- iPhone (iOS 14+ recommended) with ARKit support
+- iPhone (iOS 13+ recommended) with ARKit support
 - Apple Developer account (for device testing)
 - AWS account for S3 bucket (presigned URL generation)
 - A WebSocket server that supports mTLS
 
 ### Quick install
-1. Clone the repo.
+1. Clone repo.
 2. Open the project in Unity Hub (Unity 2022.3.x).
-3. Install required packages (Package Manager): AR Foundation, ARKit XR Plugin, Niantic Lightship (optional), Newtonsoft.Json, TextMeshPro.
+3. Install required packages (Package Manager): AR Foundation, ARKit XR Plugin, Niantic Lightship, Newtonsoft.Json, TextMeshPro.
 4. Put your P12 certificate(s) into `Assets/StreamingAssets/`.
 5. Update the default server URL (if required) in `Assets/Scripts/Comms/WS_Client.cs` or via the app settings UI.
 6. Switch platform to iOS and build to device via Xcode.
@@ -97,7 +97,7 @@ Relevant code areas:
 
 ## 🔧 Configuration & runtime settings
 
-- Joystick sensitivity: configurable via Settings UI (recommended range: 0.1x — 5.0x). Applies to both local and remote inputs.
+- Joystick sensitivity: configurable via Settings UI (recommended range: 0.1x — 5.0x). Applies to both local and remote inputs. (Still a WIP)
 - Dead zone threshold: available in Settings to reduce jitter.
 - Remote input timeout: virtual inputs zero out if packets stop (default ~200ms).
 - Sync safeguards: gallery sync caps list size (default 100 files) to avoid memory/JSON bloat.
